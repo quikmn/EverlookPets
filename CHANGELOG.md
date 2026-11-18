@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (2026-11-18)
 
 - Settings: an AI help button copies a description of every setting for an AI assistant, and `/epets apply` runs the commands it gives back.
 - **Where?** now lists the beasts that teach the rank, from EverlookDB's bestiary: ones you can tame at your level first, confirmed before seen before classic data, in your zone and then your continent first, with their levels and zones and a link to the first one's EverlookDB page. It links the site's pet page only when no beast is known.
