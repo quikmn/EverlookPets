@@ -1,0 +1,22 @@
+## Interface: 16001
+## Title: Everlook Pets
+## Notes: Hunter pets: your pet's abilities, the best rank its level allows, and how to get the next one (train, buy or tame). /epets
+## Author: quikmn
+## Version: 0.1.0
+## SavedVariables: EverlookPetsDB
+## SavedVariablesPerCharacter: EverlookPetsCharDB
+## IconTexture: Interface\Icons\Ability_Hunter_BeastTaming
+## X-License: GPL-3.0
+## X-Embeds: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, EverlookUI
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\EverlookUI\EverlookUI.lua
+Libs\EverlookUI\EverlookTooltip.lua
+Data.lua
+Logic.lua
+Core.lua
+Alerts.lua
+Tooltip.lua
+Options.lua

@@ -1,0 +1,7 @@
+package-as: EverlookPets
+
+ignore:
+  - README.md
+  - tests
+  - tools
+  - .github

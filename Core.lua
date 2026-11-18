@@ -1,0 +1,294 @@
+-- Everlook Pets: core. Names, saved settings, events, and reading the game: your pet, what it knows, what you know.
+-- Every game call goes through ns.Call (missing function or an error gives nil) and every value through ns.Num or
+-- ns.Str (secret values and odd types give nil), so a change in the client never breaks the addon.
+local ADDON, ns = ...
+
+------------------------------------------------------------------------
+-- The name. Renaming the addon: change these lines, the .toc Title and SavedVariables lines, and (if the folder
+-- changes) the .toc file name and the folder.
+------------------------------------------------------------------------
+ns.NAME = "Everlook Pets"
+ns.SLASH = "/epets"
+ns.SLASH_ID = "EVERLOOKPETS"
+ns.PREFIX = "EverlookPets" -- global frame names and the LibDataBroker name
+ns.SAVED = "EverlookPetsDB"          -- settings (account)
+ns.SAVED_CHAR = "EverlookPetsCharDB" -- your pets and what was already announced (per character)
+ns.ADDON = ADDON
+ns.ICON = "Interface\\Icons\\Ability_Hunter_BeastTaming"
+
+local UI = LibStub("EverlookUI-1")
+ns.UI = UI
+ns.Util = UI.Util
+
+------------------------------------------------------------------------
+-- Safe values and calls
+------------------------------------------------------------------------
+local issecret = issecretvalue or function() return false end
+
+-- A plain number, or nil (secret, nil, NaN or not a number).
+function ns.Num(v)
+	if v == nil or issecret(v) or type(v) ~= "number" or v ~= v then return nil end
+	return v
+end
+
+-- A plain string, or nil.
+function ns.Str(v)
+	if v == nil or issecret(v) or type(v) ~= "string" then return nil end
+	return v
+end
+
+local function after(ok, ...)
+	if ok then return ... end
+	return nil
+end
+-- Calls a game function if it exists; nil when it doesn't or when it errors.
+function ns.Call(fn, ...)
+	if type(fn) ~= "function" then return nil end
+	return after(pcall(fn, ...))
+end
+
+local function api(ns_, name) local t = _G[ns_]; return type(t) == "table" and t[name] or nil end
+ns.api = api
+
+function ns:Print(msg)
+	if ns.app then ns.app:Print(msg) else DEFAULT_CHAT_FRAME:AddMessage(ns.NAME .. ": " .. tostring(msg)) end
+end
+
+------------------------------------------------------------------------
+-- Saved settings
+------------------------------------------------------------------------
+ns.DEFAULTS = {
+	chat = true,        -- a chat line when something becomes actionable
+	lagWarn = 3,        -- say so when the pet is this many levels below you (0: never)
+	minimap = true,     -- the minimap button
+	angle = 200,        -- where the minimap button sits around the minimap (degrees)
+	tooltip = true,     -- "Tameable" lines on beasts' tooltips
+	showLocked = true,  -- list abilities that open at a higher pet level
+}
+ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {} }
+
+local function fill(dst, defaults)
+	for k, v in pairs(defaults) do
+		if dst[k] == nil then dst[k] = type(v) == "table" and {} or v end
+	end
+	return dst
+end
+
+------------------------------------------------------------------------
+-- Events
+------------------------------------------------------------------------
+local frame = CreateFrame("Frame")
+local handlers = {}
+frame:SetScript("OnEvent", function(_, event, ...)
+	for _, fn in ipairs(handlers[event] or {}) do
+		local ok, err = pcall(fn, event, ...)
+		if not ok then local h = geterrorhandler and geterrorhandler(); if h then h(err) end end
+	end
+end)
+
+-- Runs fn(event, ...) on the event. An event this client doesn't know is skipped quietly.
+function ns.On(event, fn)
+	if not handlers[event] then
+		if not pcall(frame.RegisterEvent, frame, event) then return false end
+		handlers[event] = {}
+	end
+	table.insert(handlers[event], fn)
+	return true
+end
+
+------------------------------------------------------------------------
+-- Reading the game
+------------------------------------------------------------------------
+local function bank(name, fallback)
+	local e = Enum and Enum.SpellBookSpellBank
+	local v = e and e[name]
+	if v == nil then return fallback end
+	return v
+end
+
+function ns.IsHunter()
+	local _, class = ns.Call(UnitClass, "player")
+	return ns.Str(class) == "HUNTER"
+end
+
+-- The family id for a family name the game gave (localized name: match it through our data's English keys first,
+-- then through the pet's own family id).
+local function familyIdOf(name, id)
+	id = ns.Num(id)
+	if id and ns.Data.families[id] then return id end
+	for fid, f in pairs(ns.Data.families) do
+		if f.key == name then return fid end
+	end
+	return nil
+end
+
+-- Your active pet, or nil. Fields may be nil when the game doesn't say.
+function ns.ReadPet()
+	if not ns.Call(UnitExists, "pet") then return nil end
+	local p = { knows = {} }
+	p.name = ns.Str((ns.Call(UnitName, "pet")))
+	local famName, famId = ns.Call(UnitCreatureFamily, "pet")
+	p.familyName = ns.Str(famName)
+	p.familyId = familyIdOf(p.familyName, famId)
+	p.level = ns.Num((ns.Call(UnitLevel, "pet")))
+	local happy, dmg, rate = ns.Call(api("C_PetInfo", "GetPetHappiness"))
+	p.happiness, p.damagePct, p.loyaltyRate = ns.Num(happy), ns.Num(dmg), ns.Num(rate)
+	p.loyalty = ns.Str((ns.Call(api("C_PetInfo", "GetPetLoyalty"))))
+	local total, used = ns.Call(api("C_PetInfo", "GetPetTrainingPoints"))
+	p.tpTotal, p.tpUsed = ns.Num(total), ns.Num(used)
+	local foods = ns.Call(api("C_PetInfo", "GetPetFoodTypes"))
+	if type(foods) == "table" then
+		p.foods = {}
+		for _, f in ipairs(foods) do if ns.Str(f) then p.foods[#p.foods + 1] = f end end
+	end
+	-- the pet's spellbook: every spell it knows, by id
+	local n = ns.Num((ns.Call(api("C_SpellBook", "HasPetSpells"))))
+	local get = api("C_SpellBook", "GetSpellBookItemInfo")
+	local petBank = bank("Pet", 1)
+	for i = 1, n or 0 do
+		local info = ns.Call(get, i, petBank)
+		if type(info) == "table" then
+			local id = ns.Num(info.spellID) or ns.Num(info.actionID)
+			if id then p.knows[id] = true end
+		end
+	end
+	p.spellCount = n or 0
+	return p
+end
+
+-- Does the pet know this spell? Its spellbook first, then the game's own check.
+function ns.PetKnows(p, spell)
+	if p and p.knows[spell] then return true end
+	return ns.Call(api("C_SpellBook", "IsSpellKnown"), spell, bank("Pet", 1)) == true
+end
+
+-- Do you (the hunter) know this rank, so Beast Training can teach it?
+function ns.HunterKnows(spell)
+	return ns.Call(api("C_SpellBook", "IsSpellKnown"), spell, bank("Player", 0)) == true
+end
+
+-- The pet's key in your saved pets: name and family.
+function ns.PetKey(p) return tostring(p.name or "?") .. "|" .. tostring(p.familyId or 0) end
+
+-- Remember what one of your pets knows (only our abilities' spells), for "another pet knows it".
+local function remember(key, name, familyId, level, spells)
+	local keep = {}
+	for id in pairs(spells) do if ns.rankOf[id] then keep[id] = true end end
+	ns.cdb.pets[key] = { name = name, family = familyId, level = level, spells = keep }
+end
+
+-- Your stabled and active pets as the stable shows them (only while it is open, or after it was opened).
+function ns.ReadStable()
+	local seen, any = {}, false
+	for _, fn in ipairs({ "GetActivePetList", "GetStabledPetList" }) do
+		local list = ns.Call(api("C_StableInfo", fn))
+		if type(list) == "table" then
+			for _, info in ipairs(list) do
+				local name = type(info) == "table" and ns.Str(info.name)
+				if name then
+					any = true
+					local fid = familyIdOf(ns.Str(info.familyName), nil)
+					local spells = {}
+					for _, id in ipairs(type(info.petAbilities) == "table" and info.petAbilities or {}) do
+						if ns.Num(id) then spells[id] = true end
+					end
+					local key = name .. "|" .. tostring(fid or 0)
+					seen[key] = true
+					remember(key, name, fid, ns.Num(info.level), spells)
+				end
+			end
+		end
+	end
+	-- a pet you no longer have (abandoned) stops counting
+	if any then
+		for key in pairs(ns.cdb.pets) do if not seen[key] then ns.cdb.pets[key] = nil end end
+	end
+end
+
+-- The name of another of your pets that knows this spell, or nil.
+function ns.OtherPetKnows(currentKey, spell)
+	for key, pet in pairs(ns.cdb.pets) do
+		if key ~= currentKey and pet.spells and pet.spells[spell] then return pet.name end
+	end
+	return nil
+end
+
+-- The ability's name in the game's language (our English name if the game has none).
+function ns.AbilityName(ab)
+	return ns.Str((ns.Call(api("C_Spell", "GetSpellName"), ab.ranks[1].spell))) or ab.name
+end
+
+function ns.AbilityIcon(ab, rank)
+	local spell = (rank and rank.spell) or ab.ranks[1].spell
+	return ns.Num((ns.Call(api("C_Spell", "GetSpellTexture"), spell))) or ab.icon
+end
+
+------------------------------------------------------------------------
+-- The state everything shows: ns.state = { hunter, playerLevel, pet, result }
+------------------------------------------------------------------------
+ns.state = { hunter = false }
+
+function ns:Update()
+	local st = { hunter = ns.IsHunter(), playerLevel = ns.Num((ns.Call(UnitLevel, "player"))) }
+	if st.hunter then
+		local p = ns.ReadPet()
+		st.pet = p
+		if p then
+			local key = ns.PetKey(p)
+			p.key = key
+			if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows) end
+			st.result = ns.Logic.Evaluate(ns.Data, {
+				familyId = p.familyId, petLevel = p.level or 1, playerLevel = st.playerLevel,
+				petKnows = function(spell) return ns.PetKnows(p, spell) end,
+				hunterKnows = ns.HunterKnows,
+				otherPet = function(spell) return ns.OtherPetKnows(key, spell) end,
+				nameOf = ns.AbilityName,
+			})
+		end
+	end
+	ns.state = st
+	if ns.Alerts then ns.Alerts:Check(st) end
+	if ns.app and ns.app:IsShown() then ns.app:Refresh() end
+end
+
+-- Many events come in bursts (a level up fires five): update once, a moment later.
+local queued = false
+function ns:Queue()
+	if queued then return end
+	queued = true
+	C_Timer.After(0.5, function() queued = false; ns:Update() end)
+end
+
+------------------------------------------------------------------------
+-- Start
+------------------------------------------------------------------------
+-- spell id -> { ability, rank } for every rank we know of
+ns.rankOf = {}
+for key, ab in pairs(ns.Data.abilities) do
+	for _, r in ipairs(ab.ranks) do ns.rankOf[r.spell] = { key = key, rank = r.rank } end
+end
+
+ns.On("ADDON_LOADED", function(_, name)
+	if name ~= ADDON then return end
+	_G[ns.SAVED] = fill(type(_G[ns.SAVED]) == "table" and _G[ns.SAVED] or {}, ns.DEFAULTS)
+	_G[ns.SAVED_CHAR] = fill(type(_G[ns.SAVED_CHAR]) == "table" and _G[ns.SAVED_CHAR] or {}, ns.CHAR_DEFAULTS)
+	ns.db, ns.cdb = _G[ns.SAVED], _G[ns.SAVED_CHAR]
+	if ns.OnLoaded then ns.OnLoaded() end
+end)
+
+ns.On("PLAYER_LOGIN", function()
+	if not ns.IsHunter() then return end
+	ns.state.hunter = true
+	local function queue() ns:Queue() end
+	local function petOrPlayer(_, unit) if unit == "pet" or unit == "player" then ns:Queue() end end
+	ns.On("UNIT_PET", petOrPlayer)
+	ns.On("UNIT_LEVEL", petOrPlayer)
+	ns.On("UNIT_HAPPINESS", petOrPlayer)
+	ns.On("UNIT_PET_TRAINING_POINTS", petOrPlayer)
+	for _, e in ipairs({ "PLAYER_LEVEL_UP", "SPELLS_CHANGED", "PET_BAR_UPDATE", "LEARNED_SPELL_IN_SKILL_LINE" }) do ns.On(e, queue) end
+	local function stable() ns.ReadStable(); ns:Queue() end
+	ns.On("PET_STABLE_SHOW", stable)
+	ns.On("PET_STABLE_UPDATE", stable)
+	-- the pet's spellbook fills a little after login
+	C_Timer.After(3, function() ns:Update() end)
+end)
