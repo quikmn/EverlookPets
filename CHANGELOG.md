@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.0 (2026-11-18)
 
 - First version. `/epets` opens a window with your pet: name, family, level next to yours, loyalty, free training points, happiness and what it eats.
 - Every ability your pet's family can learn, with the rank your pet has and what to do next: train it now (you know a better rank), buy it from a pet trainer, learn it from another of your pets, tame a beast that knows it (with a link to Petopia's list for that rank), or the pet level where it opens. Things to do come first.
