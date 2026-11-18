@@ -218,6 +218,25 @@ function ns.AbilityName(ab)
 	return ns.Str((ns.Call(api("C_Spell", "GetSpellName"), ab.ranks[1].spell))) or ab.name
 end
 
+-- Where you are, for "beasts near you": { level, zone (uiMap id), continent (uiMap id) }; nil fields when unknown.
+function ns.Where()
+	local out = { level = ns.Num((ns.Call(UnitLevel, "player"))) }
+	local map = ns.Num((ns.Call(api("C_Map", "GetBestMapForUnit"), "player")))
+	local info = api("C_Map", "GetMapInfo")
+	-- walk up to the zone (type 3) and the continent (type 2) the map belongs to
+	for _ = 1, 6 do
+		if not map then break end
+		local z = ns.Data.zones and ns.Data.zones[map]
+		if z and not out.zone then out.zone, out.continent = map, z[2] end
+		local mi = ns.Call(info, map)
+		if type(mi) ~= "table" then break end
+		if mi.mapType == 3 and not out.zone then out.zone = map end
+		if mi.mapType == 2 then out.continent = out.continent or map; break end
+		map = ns.Num(mi.parentMapID)
+	end
+	return out
+end
+
 function ns.AbilityIcon(ab, rank)
 	local spell = (rank and rank.spell) or ab.ranks[1].spell
 	return ns.Num((ns.Call(api("C_Spell", "GetSpellTexture"), spell))) or ab.icon

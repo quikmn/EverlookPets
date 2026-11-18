@@ -12,9 +12,12 @@ What it reads:
     With --offline, or when the site can't be reached, it falls back to classic-db (Quarry's state/classicdb.sqlite,
     creatures with the tameable flag), and if that is missing too it keeps the list already in Data.lua.
 
-What we do NOT have: which beast knows which ability rank. classic-db only points to it (creature_template
-PetSpellDataId -> the client's CreatureSpellData table), and WoW Forever's client has no CreatureSpellData.db2.
-The addon links Petopia and the site for that instead of guessing.
+  * Which beast teaches which ability rank: Quarry's web/data/bestiary.json (crates/build/src/bestiary.rs there), the
+    merge of WoW Forever players' tames (EG Link, Forever Hunter Pets, BeastScout; later our own Collector) with
+    classic data (VMaNGOS pet_spell_data) where nobody has reported a beast yet. Each rank carries a state: 3 confirmed
+    (two sources agree or several tames), 2 seen (one WoW Forever source), 1 classic. We keep per beast its levels,
+    main zone, English name, ranks with state and attack speed, and per rank its beasts best first; nothing else, so
+    Data.lua stays small. Without the file the addon falls back to the site link.
 """
 import argparse
 import json
@@ -65,10 +68,51 @@ def tameable_from_existing() -> dict:
     return {int(m[0]): (int(m[1]), int(m[2]), int(m[3])) for m in re.findall(r"\[(\d+)\]=\{(\d+),(\d+),(\d+)\}", text)}
 
 
+STATE = {"confirmed": 3, "seen": 2, "classic": 1}
+
+
+def write_bestiary(w, path: Path) -> int:
+    """D.zones, D.beasts and D.teachers from bestiary.json; empty tables when it is missing."""
+    b = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if not b:
+        print(f"no {path}: no bestiary in Data.lua (Where? links the site instead)", file=sys.stderr)
+    beasts = b.get("beasts", {})
+    w(f"-- Who teaches what: EverlookDB's bestiary (build {b.get('build', '?')}): WoW Forever players' tames (EG Link,")
+    w("-- Forever Hunter Pets, BeastScout) and classic data (VMaNGOS) where nobody has reported a beast yet.")
+    w("-- States: 3 confirmed (two sources agree, or several tames), 2 seen (one WoW Forever source), 1 classic data.")
+    used = set()
+    for e in beasts.values():
+        if e.get("z"):
+            used.add(e["z"][0][0])
+    w("-- uiMap id = { English name, continent uiMap id }")
+    w("D.zones = {")
+    for z in sorted(used):
+        name, cont = b["zones"].get(str(z), ["", 0])
+        w(f"\t[{z}] = {{ {lua_str(name)}, {cont} }},")
+    w("}")
+    w("-- npc id = { lowest level, highest level, main zone, English name, { spell, state, ... }, attack speed (0 unknown) }")
+    w("D.beasts = {")
+    for k in sorted(beasts, key=int):
+        e = beasts[k]
+        lo, hi = e.get("l", [0, 0])[:2]
+        zone = e["z"][0][0] if e.get("z") else 0
+        t = ", ".join(f"{sp}, {STATE.get(st, 1)}" for sp, st, _ in e.get("t", []))
+        speed = e.get("s", [0])[0] or 0
+        w(f"\t[{k}] = {{ {lo}, {hi}, {zone}, {lua_str(e.get('n', ''))}, {{ {t} }}, {speed} }},")
+    w("}")
+    w("-- spell id = { npc ids that teach it, best first: confirmed, seen, classic; then lowest level }")
+    w("D.teachers = {")
+    for sp in sorted(b.get("ranks", {}), key=int):
+        w(f"\t[{sp}] = {{ {', '.join(str(n) for n in b['ranks'][sp])} }},")
+    w("}")
+    return len(beasts)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--guides", default=str(QUARRY / "web" / "data" / "guides.json"))
     ap.add_argument("--classicdb", default=str(QUARRY / "state" / "classicdb.sqlite"))
+    ap.add_argument("--bestiary", default=str(QUARRY / "web" / "data" / "bestiary.json"))
     ap.add_argument("--offline", action="store_true")
     a = ap.parse_args()
 
@@ -123,9 +167,10 @@ def main() -> int:
     for i in range(0, len(items), 8):
         w("\t" + ",".join(items[i:i + 8]) + ",")
     w("}")
+    nb = write_bestiary(w, Path(a.bestiary))
     OUT.write_text("\n".join(L) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {OUT}: {len(pets['families'])} families, {len(pets['abilities'])} abilities, "
-          f"{len(tame)} tameable beasts ({source})")
+          f"{len(tame)} tameable beasts ({source}), {nb} beasts in the bestiary; {OUT.stat().st_size // 1024} KB")
     return 0
 
 

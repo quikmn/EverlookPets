@@ -1,5 +1,6 @@
--- Everlook Pets: a "Tameable" line on wild beasts' tooltips (hunters only): the family, its level, and what that
--- family can learn. Which ranks a single beast knows is not in our data (see README), so it doesn't guess.
+-- Everlook Pets: a "Tameable" line on wild beasts' tooltips (hunters only): the family, its level, what that family
+-- can learn, and, from EverlookDB's bestiary, what this beast teaches when tamed ("Teaches: Bite 2 · Claw 3") with
+-- how sure that is (confirmed, seen in WoW Forever, or classic data).
 -- Uses the shared EverlookTooltip layout, so its lines sit with the other EverlookDB addons' lines.
 local _, ns = ...
 local Tip = LibStub and LibStub("EverlookTooltip-1", true)
@@ -13,9 +14,16 @@ function ns.NpcId(guid)
 	return tonumber(id)
 end
 
--- The lines for one beast, as { label, value, note, details }; nil when it isn't tameable.
+-- The lines for one beast, as { label, value, note, learns, teaches, teachesFrom, tooHigh }; nil when it isn't tameable.
 function ns.TameLines(npcId, familyName, playerLevel)
 	local info = npcId and ns.Data.tameable[npcId]
+	local beast = npcId and ns.Data.beasts and ns.Data.beasts[npcId]
+	if not info and beast then
+		-- tameable as far as the bestiary knows (players tamed it, or classic data): family from the game's tooltip
+		for fid, f in pairs(ns.Data.families) do
+			if f.key == familyName then info = { fid, beast[1], beast[2] } end
+		end
+	end
 	if not info then return nil end
 	local fam = ns.Data.families[info[1]]
 	if not fam then return nil end
@@ -27,6 +35,7 @@ function ns.TameLines(npcId, familyName, playerLevel)
 		if ab and not ab.trainer then learns[#learns + 1] = ns.AbilityName(ab) end
 	end
 	out.learns = table.concat(learns, ", ")
+	out.teaches, out.teachesFrom = ns.Logic.TeachesText(ns.Data, npcId, ns.AbilityName)
 	if playerLevel and lo > playerLevel then out.tooHigh = lo end
 	return out
 end
@@ -41,6 +50,12 @@ Tip:Register({
 		if not lines then return end
 		t:Line(lines.label, lines.value, { note = lines.note })
 		if lines.tooHigh then t:Detail("Too high for you until level " .. lines.tooHigh, nil, { always = true }) end
+		if lines.teaches then
+			local mark = ns.Logic.STATE_LABEL[lines.teachesFrom] or lines.teachesFrom
+			t:Line("Teaches", lines.teaches, { note = mark })
+		else
+			t:Detail("Teaches", "not reported yet")
+		end
 		if lines.learns ~= "" then t:Detail("Its family learns", lines.learns) end
 	end,
 })

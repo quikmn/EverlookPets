@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Where?** now lists the beasts that teach the rank, from EverlookDB's bestiary: ones you can tame at your level first, confirmed before seen before classic data, in your zone and then your continent first, with their levels and zones and a link to the first one's EverlookDB page. It links the site's pet page only when no beast is known.
+- Wild beasts' tooltips say what they teach when tamed: "Teaches: Bite 2 · Claw 3", marked confirmed, seen in WoW Forever or classic data.
+- Abilities new in WoW Forever (Dismember, Pinch, Swipe...) become a normal "tame" to do once players have seen a beast teach them.
+- Where the bestiary comes from: hunters' tames in WoW Forever (EG Link by Efficient Games, Forever Hunter Pets, BeastScout) and the classic 1.12 client's data (VMaNGOS) where nobody has reported a beast yet. Credits in the Data and links page and the README.
+
 ## v0.1.0 (2026-11-18)
 
 - First version. `/epets` opens a window with your pet: name, family, level next to yours, loyalty, free training points, happiness and what it eats.

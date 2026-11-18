@@ -15,9 +15,11 @@ do next. Things to do come first:
 - **Train now: you know rank 7, your pet has 6.** Teach it with Beast Training.
 - **Buy rank 4 from a pet trainer.** Growl, Cower, Great Stamina, Natural Armor and the resistances.
 - **Fang knows rank 7: learn it from that pet.** Another of your pets (active or stabled) has it.
-- **Tame a beast that knows rank 7.** With a "Where?" button: Petopia's list of beasts for that rank.
-- **Rank 3: new in WoW Forever.** Abilities Forever added (Dismember, Pinch, Swipe...): how they're learned isn't in
-  the game files yet, so it points to EverlookDB.
+- **Tame a beast that knows rank 7.** With a "Where?" button: the best beasts for that rank, ones you can tame at
+  your level first, confirmed before seen before classic data, in your zone and then your continent first, with
+  their levels and zones and a link to the first one's EverlookDB page. The site's pet page when no beast is known.
+- **Rank 3: new in WoW Forever.** Abilities Forever added (Dismember, Pinch, Swipe...) that nobody has reported a
+  beast for yet point to EverlookDB; once players have, they become a tame like any other.
 - **Trained: rank 6 · rank 7 at pet level 48**, or **Opens at pet level 30**.
 
 Hover a row for the longer explanation and the links.
@@ -53,14 +55,18 @@ Bugs and ideas: [Issues](https://github.com/quikmn/EverlookPets/issues), or `/ep
 
 - families, diets, abilities, ranks and the pet level each rank needs: Quarry's `web/data/guides.json` ("pets"), built
   from the WoW Forever client;
-- tameable beasts (npc id, family, levels): the site's query API (`npcs | where tameable == 1`), else classic-db.
+- tameable beasts (npc id, family, levels): the site's query API (`npcs | where tameable == 1`), else classic-db;
+- which beast teaches which rank: Quarry's `web/data/bestiary.json` (rank -> beasts with level range, zone and
+  state; beast -> its ranks and attack speed).
 
 Spell names and icons come from the game at run time, so they're in your language.
 
-**Which beast knows which rank is not in our data.** classic-db only points to it (each beast's `PetSpellDataId`
-refers to the client's `CreatureSpellData` table), and WoW Forever's client has no `CreatureSpellData.db2`. Rather than
-guess, the addon links Petopia (`wow-petopia.com/classic/abilities.php#bite7`) and EverlookDB's pet page
-(`everlookdb.com/pets.html?family=cat&level=48`, beasts to tame near that level).
+**Which beast teaches which rank** isn't in the game files WoW Forever ships (its client has no
+`CreatureSpellData.db2`), so it comes from EverlookDB's bestiary: hunters' tames in WoW Forever, shared by
+EG Link (Efficient Games, CC BY 4.0), Forever Hunter Pets (MIT) and BeastScout's community data (GPL-3.0), and, where
+nobody has reported a beast yet, the classic 1.12 client's data from VMaNGOS (GPL-2.0-or-later). Every rank says how
+sure it is: **confirmed** (two sources agree, or several tames), **seen** in WoW Forever (one source) or **classic
+data** (WoW Forever may differ). Wild beasts' tooltips show it too: "Teaches: Bite 2 · Claw 3 (confirmed)".
 
 ## How it reads the game
 
@@ -83,4 +89,8 @@ whole addon with a fake hunter and pet.
 ## License
 
 GPL-3.0-or-later (see LICENSE). Tameable beast levels come partly from classic-db by the CMaNGOS community (GPL-3.0,
-https://github.com/cmangos/classic-db). Not affiliated with Blizzard Entertainment or Petopia.
+https://github.com/cmangos/classic-db). Beast abilities: data from Efficient Games (EG Link, CC BY 4.0,
+https://github.com/JIVESCORP/eg-link-output-wowf); Forever Hunter Pets by Elmar Höfinghoff (MIT,
+https://github.com/Jazzman1976/Forever-Hunter-Pets); BeastScout by trevercomb (GPL-3.0,
+https://github.com/trevercomb/BeastScout); VMaNGOS world database (GPL-2.0-or-later, https://github.com/vmangos/core),
+game data © Blizzard Entertainment. Not affiliated with Blizzard Entertainment or Petopia.

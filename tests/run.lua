@@ -149,6 +149,50 @@ step("logic: alerts only for what changed", function()
 	eq(L.LagText(2, 3), nil); eq(L.LagText(9, 0), nil, "0 means never")
 end)
 
+step("bestiary: who teaches a rank, best for you first", function()
+	local NEW = { name = "Swipe", petopia = "swipe", trainer = false, forever = true,
+		ranks = { { rank = 1, level = 12, spell = 301, forever = true } } }
+	local D = {
+		abilities = { Bite = BITE, Swipe = NEW },
+		families = { [2] = { key = "Cat", abilities = { "Bite", "Swipe" } } },
+		zones = { [10] = { "Elwynn Forest", 1 }, [11] = { "Westfall", 1 }, [20] = { "Durotar", 2 } },
+		beasts = {
+			[1] = { 15, 16, 20, "Far Cat", { 103, 3 }, 1.5 },            -- confirmed, other continent
+			[2] = { 14, 15, 11, "Near Cat", { 103, 1, 101, 2 }, 2.0 },     -- classic, same continent
+			[3] = { 15, 15, 10, "Here Cat", { 103, 2, 104, 3 }, 0 },       -- seen, your zone
+			[4] = { 30, 31, 10, "Big Cat", { 103, 3 }, 0 },               -- confirmed but too high for you
+			[5] = { 16, 16, 10, "Zone Cat", { 103, 3 }, 0 },              -- confirmed, your zone
+		},
+		teachers = { [103] = { 1, 4, 5, 3, 2 }, [301] = { 3 } },
+	}
+	local top, all = L.Teachers(D, 103, { level = 16, zone = 10, continent = 1 }, 5)
+	eq(all, 5, "all known")
+	eq(top[1].name, "Zone Cat", "confirmed and in your zone first")
+	eq(top[2].name, "Far Cat", "then confirmed elsewhere")
+	eq(top[3].name, "Here Cat", "then seen")
+	eq(top[4].name, "Near Cat", "then classic")
+	eq(top[5].name, "Big Cat", "too high for you last")
+	check(top[5].tooHigh, "flagged too high")
+	eq(top[2].zoneName, "Durotar")
+	eq(L.TeacherLine(top[3]), "Here Cat  15 · Elwynn Forest · seen in WoW Forever")
+	eq(#L.Teachers(D, 103, nil, 2), 2, "at most n")
+	eq(#L.Teachers(D, 999), 0, "nobody known")
+	-- one beast: "Teaches" text and the weakest state it rests on
+	local text, st = L.TeachesText(D, 2)
+	eq(text, "Bite 1 · Bite 3"); eq(st, "classic")
+	text, st = L.TeachesText(D, 5, function(ab) return ab.name:upper() end)
+	eq(text, "BITE 3"); eq(st, "confirmed")
+	eq(L.TeachesText(D, 99), nil, "unknown beast")
+	-- a Forever-only rank that players have seen taught becomes a tame to do
+	local res = L.Evaluate(D, { familyId = 2, petLevel = 16, playerLevel = 16 })
+	for _, r in ipairs(res.rows) do
+		if r.key == "Swipe" then eq(r.state, "tame", "forever rank with a known beast"); check(r.actionable, "actionable") end
+	end
+	D.teachers[301] = nil
+	res = L.Evaluate(D, { familyId = 2, petLevel = 16, playerLevel = 16 })
+	for _, r in ipairs(res.rows) do if r.key == "Swipe" then eq(r.state, "forever", "no beast known") end end
+end)
+
 ------------------------------------------------------------------------
 -- The addon in the (fake) game, with the real data
 ------------------------------------------------------------------------
@@ -255,7 +299,9 @@ step("opening the window clears the badge; rows and links", function()
 	local rows = ns.Options.Rows()
 	check(#rows > 5, "rows listed")
 	local tip = ns.Options.RowTooltip(row("Bite"))
-	check(has(tip, "Petopia: https://www.wow-petopia.com/classic/abilities.php#bite3"), table.concat(tip, " / "))
+	-- beasts that teach Bite 3 are known, so the tooltip names them instead of linking Petopia
+	check(has(tip, "Taught by"), table.concat(tip, " / "))
+	check(not has(tip, "Petopia:"), table.concat(tip, " / "))
 	check(has(tip, "EverlookDB: https://everlookdb.com/pets.html?family=cat&level=16"), table.concat(tip, " / "))
 	ns.db.showLocked = false
 	for _, r in ipairs(ns.Options.Rows()) do check(r.state ~= "locked", "locked hidden") end
@@ -306,6 +352,35 @@ step("tooltip: tameable beasts", function()
 		check(cat.learns:find("Bite", 1, true) and not cat.learns:find("Growl", 1, true), cat.learns)
 	end
 	eq(ns.TameLines(999999, nil, 60), nil, "not tameable")
+	-- 505 Greater Tarantula: its tames (EG Link, BeastScout) agree on Bite 3
+	local spider = ns.TameLines(505, "Spider", 20)
+	check(spider and spider.teaches, "teaches line")
+	check(spider.teaches:find("Bite 3", 1, true), spider.teaches)
+	eq(spider.teachesFrom, "confirmed")
+end)
+
+step("Where? lists the beasts for the rank from the real data, the site only when none is known", function()
+	local bite = row("Bite")
+	eq(bite.state, "tame"); eq(bite.target.rank, 3)
+	local lines, url = ns.Options:ShowWhere(bite)
+	check(lines and #lines >= 2, "a list")
+	check(lines[1]:find("Bite rank 3", 1, true), lines[1])
+	check(url:find("https://everlookdb.com/npc.html?id=", 1, true), url)
+	local top = ns.Logic.Teachers(ns.Data, bite.target.spell, ns.Where(), 6)
+	check(strip(lines[2]):find(top[1].name, 1, true), strip(lines[2]))
+	-- the mock puts you in map 1424 (Hillsbrad Foothills): its continent is known from the data
+	local w = ns.Where()
+	eq(w.level, MOCK.level or w.level)
+	if ns.Data.zones[1424] then eq(w.zone, 1424); eq(w.continent, ns.Data.zones[1424][2]) end
+	-- no beast known: the site's pet page
+	local saved = ns.Data.teachers[bite.target.spell]
+	ns.Data.teachers[bite.target.spell] = nil
+	local none, site = ns.Options:ShowWhere(bite)
+	eq(none, nil)
+	check(site:find("https://everlookdb.com/pets.html", 1, true), site)
+	ns.Data.teachers[bite.target.spell] = saved
+	local tip = ns.Options.RowTooltip(bite)
+	check(has(tip, "Taught by"), table.concat(tip, " / "))
 end)
 
 step("no pet, then not a hunter", function()

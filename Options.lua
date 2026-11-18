@@ -57,6 +57,9 @@ local linkWin
 function O:ShowLink(intro, url)
 	if not linkWin then linkWin = UI.LinkWindow(ns.PREFIX .. "LinkWindow", T, intro, url) end
 	linkWin:SetLink(intro .. "\nPress Ctrl+C to copy, then paste it in your browser.", url)
+	linkWin:SetHeight(132)
+	linkWin.box:ClearAllPoints()
+	linkWin.box:SetPoint("TOP", 0, -54)
 	linkWin:Hide()
 	linkWin:Show()
 end
@@ -98,13 +101,44 @@ function O.RowTooltip(row)
 	local lines = { row.name, status, how }
 	local fam = ns.state.result and ns.state.result.family
 	if row.next then lines[#lines + 1] = ("Next: rank %d at pet level %d."):format(row.next.rank, row.next.level) end
-	if row.state == "tame" then
-		lines[#lines + 1] = "Petopia: " .. Logic.PetopiaRank(row.ability, row.target.rank)
-		lines[#lines + 1] = "EverlookDB: " .. Logic.SiteLink(fam, row.target.level)
-	elseif row.state == "forever" then
+	if row.state == "tame" or row.state == "forever" then
+		local top, all = Logic.Teachers(ns.Data, row.target.spell, ns.Where(), 3)
+		if #top > 0 then
+			lines[#lines + 1] = ("Taught by (%d known; Where? for more):"):format(all)
+			for _, t in ipairs(top) do lines[#lines + 1] = "  " .. Logic.TeacherLine(t) end
+		elseif row.state == "tame" then
+			lines[#lines + 1] = "Petopia: " .. Logic.PetopiaRank(row.ability, row.target.rank)
+		end
 		lines[#lines + 1] = "EverlookDB: " .. Logic.SiteLink(fam, row.target.level)
 	end
 	return lines
+end
+
+-- Where?: the best beasts for the rank, near your level and where you are; the site's link when none is known.
+-- Returns what it showed (for the tests): the lines and the link.
+function O:ShowWhere(row)
+	local t = row.target
+	local top, all = Logic.Teachers(ns.Data, t.spell, ns.Where(), 6)
+	if #top == 0 then
+		local url = Logic.SiteLink(ns.state.result and ns.state.result.family, t.level)
+		self:ShowLink(("No beast known yet for %s rank %d. EverlookDB's pet page has the latest."):format(row.name, t.rank), url)
+		return nil, url
+	end
+	local lines = { ("|cffffd100%s rank %d|r: %d beast%s known, best for you first"):format(row.name, t.rank, all, all == 1 and "" or "s") }
+	for _, b in ipairs(top) do
+		local c = b.state == "confirmed" and "|cff62cf88" or b.state == "seen" and "|cffffffff" or "|cff8d94a3"
+		lines[#lines + 1] = c .. Logic.TeacherLine(b) .. "|r" .. (b.tooHigh and ("  |cffef5d5d(level " .. b.lo .. "+)|r") or "")
+	end
+	lines[#lines + 1] = "The first one's EverlookDB page (map and spawns):"
+	local url = Logic.NPC_URL .. top[1].id
+	self:ShowLink(table.concat(lines, "\n"), url)
+	-- the link window is sized for one line: make room for the list
+	if linkWin then
+		linkWin:SetHeight(110 + 14 * #lines)
+		linkWin.box:ClearAllPoints()
+		linkWin.box:SetPoint("BOTTOM", 0, 50)
+	end
+	return lines, url
 end
 
 app:Section("pet", "Your pet", function(stack)
@@ -168,13 +202,7 @@ app:Section("pet", "Your pet", function(stack)
 		empty = "Nothing to show yet.",
 		buttons = {
 			{ label = "Where?", width = 70, shown = function(row) return row.state == "tame" or row.state == "forever" end,
-				onClick = function(row)
-					if row.state == "tame" then
-						O:ShowLink(("Petopia: beasts that know %s rank %d."):format(row.name, row.target.rank), Logic.PetopiaRank(row.ability, row.target.rank))
-					else
-						O:ShowLink(("EverlookDB: %s."):format(row.name), Logic.SiteLink(ns.state.result.family, row.target.level))
-					end
-				end },
+				onClick = function(row) O:ShowWhere(row) end },
 		},
 	})
 end)
@@ -203,9 +231,10 @@ app:Section("data", "Data and links", function(stack)
 	UI.Header(stack, "Where the data comes from")
 	UI.Note(stack, "Families, diets, abilities and the pet level each rank needs: EverlookDB's pet data, from the WoW Forever "
 		.. "game files (build " .. (ns.Data.build or "?") .. "). Tameable beasts: EverlookDB (the game's tameable flag, classic-db levels).")
-	UI.Note(stack, "Which beast knows which rank is not in the game files WoW Forever ships, so Everlook Pets doesn't guess. "
-		.. "Petopia, the long-running hunter pet site, lists the beasts for every rank; EverlookDB's pet page lists beasts "
-		.. "to tame near a level.")
+	UI.Note(stack, "Which beast teaches which rank: EverlookDB's bestiary. It comes from hunters' tames in WoW Forever (EG Link by "
+		.. "Efficient Games, Forever Hunter Pets, BeastScout) and, where nobody has reported a beast yet, classic data (VMaNGOS). "
+		.. "Each rank says how sure it is: |cff62cf88confirmed|r (two sources agree, or several tames), seen in WoW Forever "
+		.. "(one source), or |cff8d94a3classic data|r (WoW Forever may differ). The game files WoW Forever ships don't have it.")
 	UI.CopyBox(stack, "EverlookDB pets", function() return siteURL() end)
 	UI.CopyBox(stack, "Petopia abilities", Logic.PETOPIA .. "abilities.php")
 end)
