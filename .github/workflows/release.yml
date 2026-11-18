@@ -1,0 +1,34 @@
+# Push a tag like v1.0.0 and this builds EverlookPets-v1.0.0-forever.zip and a GitHub release, plus a copy named EverlookPets.zip
+# so https://github.com/quikmn/EverlookPets/releases/latest/download/EverlookPets.zip always gets the newest. WowUp uses release.json.
+# No CurseForge project yet: when there is one, add the upload step from EverlookDBAuctions (curseforge-upload.sh <project id>).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      - name: Same zip under a fixed name (direct download link on everlookdb.com)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp .release/EverlookPets-${GITHUB_REF_NAME}-forever.zip .release/EverlookPets.zip
+          gh release upload "$GITHUB_REF_NAME" .release/EverlookPets.zip --clobber
+      - name: Release notes from CHANGELOG.md (GitHub release page)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .github/release-notes.sh "$GITHUB_REF_NAME" > .release/notes.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file .release/notes.md

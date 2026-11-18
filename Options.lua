@@ -11,6 +11,7 @@ local app = UI:NewApp({
 	addon = ADDON,
 	slash = ns.SLASH,
 	aliases = { "/everlookpets" },
+	feedbackURL = "https://everlookdb.com/everlook-pets.html#feedback",
 	frameName = ns.PREFIX,
 	tagline = "Your hunter pet's abilities: what it has, what its level allows, and how to get the next rank.",
 	position = function() return ns.db end,

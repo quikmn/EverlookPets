@@ -1,7 +1,8 @@
 # Everlook Pets
 
 Hunter pets for WoW Forever (1.60.1, interface 16001): your pet's abilities, the best rank its level allows, and how
-to get the next one. Working name; renaming is a few lines (see Renaming).
+to get the next one. From the makers of [EverlookDB.com](https://everlookdb.com); the addon's page is
+[everlookdb.com/everlook-pets.html](https://everlookdb.com/everlook-pets.html).
 
 ## What it does
 
@@ -29,13 +30,22 @@ what's new until you open the window.
 **Tameable beasts.** Hovering a wild beast shows "Tameable", its family and level, whether it's too high for you yet,
 and what its family learns.
 
+## Install
+
+WowUp: pick **World of Warcraft: Forever**, then Get Addons → Install from URL, and paste `https://github.com/quikmn/EverlookPets`.
+
+By hand: download the latest zip from Releases (`EverlookPets.zip`) and unzip it into
+`World of Warcraft\_forever_\Interface\AddOns`.
+
+Bugs and ideas: [Issues](https://github.com/quikmn/EverlookPets/issues), or `/epets feedback` in game.
+
 ## Using it
 
 - `/epets` opens the window (also under Settings > AddOns). `/everlookpets` works too.
 - `/epets check` lists what to do now in chat.
 - `/epets chat off`, `/epets lag 5`, `/epets minimap off`, `/epets tooltip off`, `/epets locked off`: settings from
   chat (`/epets get` lists them all).
-- `/epets search <words>`, `/epets status`, `/epets version`, `/epets reset` (asks first), `/epets help`.
+- `/epets search <words>`, `/epets status`, `/epets version`, `/epets reset` (asks first), `/epets feedback`, `/epets help`.
 
 ## Data
 
@@ -70,12 +80,7 @@ Only functions in WoW Forever's API list, each one guarded:
 `python -P tests/run.py` (Lua 5.1 through lupa, against `tests/wowmock.lua`): the rank logic on fake data, then the
 whole addon with a fake hunter and pet.
 
-## Renaming
-
-The name lives at the top of `Core.lua` (`ns.NAME`, `ns.SLASH`, `ns.SLASH_ID`, `ns.PREFIX`, `ns.SAVED`,
-`ns.SAVED_CHAR`), plus the `.toc` Title and SavedVariables lines; a new folder name also needs the `.toc` file name,
-`install-addons.ps1` and `D:\Dev\EverlookUI\sync.py`.
-
 ## License
 
-GPL-3.0. Tameable beast levels come partly from classic-db (CMaNGOS, GPL-3.0).
+GPL-3.0-or-later (see LICENSE). Tameable beast levels come partly from classic-db by the CMaNGOS community (GPL-3.0,
+https://github.com/cmangos/classic-db). Not affiliated with Blizzard Entertainment or Petopia.

@@ -8,4 +8,4 @@
 - Says when your pet falls behind your level ("Your pet is 5 levels below you"); you pick from how many levels, or never.
 - A minimap button and a data-broker plugin (Everlook Bar, Titan Panel...) with your pet's level and a count of what's new.
 - Wild beasts you can tame say so on their tooltip: family, level, whether it's too high for you yet, and what the family learns.
-- Every setting also works from chat (`/epets lag 5`, `/epets chat off`); `/epets check` lists what to do in chat; `/epets help` lists the commands.
+- Every setting also works from chat (`/epets lag 5`, `/epets chat off`); `/epets check` lists what to do in chat; `/epets feedback` gives a link for bugs and ideas; `/epets help` lists the commands.
