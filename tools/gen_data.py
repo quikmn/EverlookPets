@@ -140,10 +140,30 @@ def spots(points: list, cell: float = 4.0, per_zone: int = 3, most: int = 6) -> 
     return out
 
 
-def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set) -> list:
+def collector_npc(npc: int, offline: bool) -> dict:
+    """What players' EverlookDB Collector uploads saw of one creature (levels, positions), {} when nothing yet."""
+    if offline:
+        return {}
+    base = API.split("/api/")[0]
+    req = urllib.request.Request(f"{base}/api/v1/crowd/npc/{npc}", headers={"User-Agent": "everlookpets-gen-data"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.load(r)
+    except Exception:
+        return {}
+
+
+def collector_points(c: dict) -> list:
+    """Collector positions ({map, cells: [[x, y, n], ...]} in tenths of a percent) -> [[map, x, y], ...] percent."""
+    return [[p["map"], x / 10, y / 10] for p in c.get("positions") or [] for x, y, *_ in p.get("cells") or []]
+
+
+def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, offline: bool = False) -> list:
     """D.wild lines: per tameable beast its English name, rank, model and where it spawns."""
     classic = load_json(data_dir / "classicdb.json").get("npcs", {})
     jazz = load_json(data_dir / "jazzman.json").get("beasts", {})
+    # where EG Link players met each creature in WoW Forever (CC BY 4.0): the only spots for WoW Forever's new beasts
+    eg = load_json(data_dir / "eglink.json").get("npcs", {})
     by_name = {}
     for mid, (name, _, typ) in sorted(maps.items()):
         if typ in (3, 4, 5) and name not in by_name:
@@ -159,8 +179,15 @@ def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set) -> 
         src, groups = 0, []
         if jz.get("at"):
             src, groups = 1, spots(jz["at"])
+        elif eg.get(str(npc), {}).get("at"):
+            src, groups = 1, spots([p for p in eg[str(npc)]["at"] if len(p) >= 3])
         elif c.get("at"):
             groups = spots(c["at"])
+        if not groups:
+            # last: where our own Collector's players saw it (WoW Forever)
+            pts = collector_points(collector_npc(npc, offline))
+            if pts:
+                src, groups = 1, spots(pts)
         places = []
         for m, pts in groups:
             used.add(m)
@@ -255,9 +282,17 @@ def main() -> int:
     best = load_json(Path(a.bestiary))
     if not best:
         print(f"no {a.bestiary}: no bestiary in Data.lua (Where? links the site instead)", file=sys.stderr)
+    # WoW Forever's own beasts have no level in classic-db: take the levels players' tames reported (bestiary.json)
+    for npc, (fam, lo, hi) in list(tame.items()):
+        if not lo:
+            l = ((best or {}).get("beasts", {}).get(str(npc), {}).get("l") or [0, 0])[:2]
+            if not l[0] and not a.offline:
+                l = (collector_npc(npc, False).get("level") or [0, 0])[:2]
+            if l and l[0]:
+                tame[npc] = (fam, l[0], l[1] if len(l) > 1 and l[1] else l[0])
     maps = uimaps(Path(a.uimap))
     used = set()
-    wild = wild_rows(tame, info, data_dir, maps, used)
+    wild = wild_rows(tame, info, data_dir, maps, used, a.offline)
     costs = training_costs(data_dir)
 
     L = []
@@ -297,7 +332,7 @@ def main() -> int:
     w("}")
     nb = write_bestiary(w, best, maps, used)
     w("-- The bestiary browser: npc id = { English name, rank (0 normal, 1 elite, 2 rare, 3 rare elite), display id")
-    w("-- (0 unknown), spots from (1 WoW Forever players: Forever Hunter Pets, MIT; 0 classic-db, GPL-3.0),")
+    w("-- (0 unknown), spots from (1 WoW Forever players: Forever Hunter Pets, MIT, EG Link, CC BY 4.0, or our Collector; 0 classic-db, GPL-3.0),")
     w("-- { { uiMap, x, y, x, y... }, ... } } with x and y in tenths of a percent of that map. A zone without spots is")
     w("-- { uiMap } or { \"name\" } (an instance).")
     w("D.wild = {")
