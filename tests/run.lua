@@ -827,6 +827,12 @@ step("no pet, then not a hunter", function()
 	ns:Update()
 	check(not ns.state.hunter, "mage")
 	eq(ns.Alerts:Summary(), "Hunters only")
+	-- a non-hunter never starts the unit watching or the bar plugin
+	local was = ns.Alerts.watching
+	ns.Alerts.watching = nil
+	check(ns.Alerts:StartWatching() == false and not ns.Alerts.watching, "mage watches nameplates")
+	ns.Alerts.watching = was
+	check(was, "the hunter watches")
 	MOCK.class = "HUNTER"
 	ns:Update()
 end)

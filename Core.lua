@@ -420,9 +420,12 @@ ns.On("ADDON_LOADED", function(_, name)
 	if ns.OnLoaded then ns.OnLoaded() end
 end)
 
+-- Other classes stop here: no pet events, no alerts, no plugin, no map pins (MapPins.lua), no tooltip lines. The
+-- Bestiary (/epets beasts) still works for everyone; its data is part of the addon's files.
 ns.On("PLAYER_LOGIN", function()
 	if not ns.IsHunter() then return end
 	ns.state.hunter = true
+	if ns.Alerts then ns.Alerts:StartWatching(); ns.Alerts:SetupBroker() end
 	local function queue() ns:Queue() end
 	local function later() ns:QueueLater() end
 	local function petOrPlayer(_, unit) if unit == "pet" or unit == "player" then ns:Queue() end end

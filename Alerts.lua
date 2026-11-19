@@ -170,9 +170,15 @@ function A:SeeUnit(unit)
 	end
 end
 
-ns.On("NAME_PLATE_UNIT_ADDED", function(_, unit) A:SeeUnit(unit) end)
-ns.On("PLAYER_TARGET_CHANGED", function() A:SeeUnit("target") end)
-ns.On("UPDATE_MOUSEOVER_UNIT", function() A:SeeUnit("mouseover") end)
+-- Hunters only: other classes never register these (they fire constantly: every nameplate, every mouse-over).
+function A:StartWatching()
+	if self.watching or not ns.IsHunter() then return false end
+	self.watching = true
+	ns.On("NAME_PLATE_UNIT_ADDED", function(_, unit) A:SeeUnit(unit) end)
+	ns.On("PLAYER_TARGET_CHANGED", function() A:SeeUnit("target") end)
+	ns.On("UPDATE_MOUSEOVER_UNIT", function() A:SeeUnit("mouseover") end)
+	return true
+end
 
 ------------------------------------------------------------------------
 -- Summary text, shared by the plugin, the minimap button and its tooltip
@@ -223,9 +229,10 @@ end
 -- LibDataBroker plugin (shown by any data-broker display, Everlook Bar included)
 ------------------------------------------------------------------------
 local ldb
+-- Hunters only: another class would get a "Hunters only" plugin on its bars.
 function A:SetupBroker()
 	local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
-	if not LDB or ldb then return end
+	if not LDB or ldb or not ns.IsHunter() then return end
 	ldb = LDB:NewDataObject(ns.PREFIX, {
 		type = "data source", label = "Pet", text = "", icon = ns.ICON,
 		OnClick = function() if ns.app then ns.app:Toggle() end end,
