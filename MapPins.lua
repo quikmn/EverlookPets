@@ -29,6 +29,14 @@ function MP.Pins(map)
 	return B.PinsOn(ns.Data, map, missing, st.playerLevel)
 end
 
+-- The note beside the map's switch: pins live on zone maps, so a continent or the world map says where to look.
+-- mapType: the game's (0 cosmic, 1 world, 2 continent, 3 zone...). Returns the text or nil.
+function MP.Hint(mapType, enabled)
+	if not enabled or type(mapType) ~= "number" then return nil end
+	if mapType <= 2 then return "Open a zone's map to see tameable beasts." end
+	return nil
+end
+
 -- The weakest state among a pin's ranks decides its edge colour.
 local EDGE = { confirmed = { 0.384, 0.812, 0.533 }, seen = { 0.902, 0.910, 0.933 }, classic = { 0.553, 0.580, 0.639 } }
 local WEAK = { confirmed = 3, seen = 2, classic = 1 }
@@ -111,8 +119,9 @@ function MP:Setup()
 	end
 	function P:RefreshAllData()
 		self:RemoveAllData()
-		if not MP:Enabled() then return end
 		local id = self:GetMap():GetMapID()
+		MP:ShowHint(id)
+		if not MP:Enabled() then return end
 		for _, info in ipairs(MP.Pins(id)) do self:GetMap():AcquirePin(MP.TEMPLATE, info) end
 	end
 	local ok = pcall(map.AddDataProvider, map, P)
@@ -129,8 +138,22 @@ function MP:Setup()
 	ns.UI.Tooltip(b, "Tameable beasts (" .. ns.NAME .. ")", "Pins where beasts spawn that teach a rank your pet lacks and that you "
 		.. "can tame at your level. Edge: green confirmed, white seen in WoW Forever, grey classic data.")
 	self.switch = b
+	-- the small note beside it (continent and world maps have no pins)
+	local hint = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	hint:SetPoint("LEFT", b, "RIGHT", 8, 0)
+	hint:SetTextColor(0.85, 0.87, 0.9, 1)
+	hint:Hide()
+	self.hint = hint
 	self:Refresh()
 	return true
+end
+
+function MP:ShowHint(mapId)
+	if not self.hint then return end
+	local mi = mapId and ns.Call(ns.api("C_Map", "GetMapInfo"), mapId)
+	local text = MP.Hint(type(mi) == "table" and ns.Num(mi.mapType) or nil, MP:Enabled())
+	self.hint:SetText(text or "")
+	self.hint:SetShown(text ~= nil)
 end
 
 function MP:Refresh()

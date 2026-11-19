@@ -837,6 +837,14 @@ step("no pet, then not a hunter", function()
 	ns:Update()
 end)
 
+step("world map: a continent says to open a zone's map; zones don't", function()
+	local MPx = ns.MapPins
+	eq(MPx.Hint(2, true), "Open a zone's map to see tameable beasts.", "continent")
+	eq(MPx.Hint(1, true), "Open a zone's map to see tameable beasts.", "world")
+	eq(MPx.Hint(3, true), nil, "zone")
+	eq(MPx.Hint(2, false), nil, "pins off: no note")
+end)
+
 step("renaming your pet moves what was saved about it (no orphans under the old name)", function()
 	local saved = { name = MOCK.pet.name, guid = MOCK.petGUID }
 	MOCK.petGUID = "Pet-0-4372-1-14-681-0200ABCDEF"
