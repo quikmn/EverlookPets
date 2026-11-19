@@ -39,8 +39,9 @@ app:Setting({ key = "lag", type = "number", label = "Note when my pet is this ma
 	get = function() return ns.db.lagWarn end, set = function(v) ns.db.lagWarn = v end,
 	after = function() ns:Update() end })
 app:Setting({ key = "minimap", type = "bool", label = "Minimap button (with a count of what's new)",
+	desc = "Off by default while Everlook Bar is loaded: its Everlook Pets plugin on the bar shows the same count.",
 	keywords = { "icon", "badge", "button" },
-	get = function() return ns.db.minimap end, set = function(v) ns.db.minimap = v end,
+	get = function() return ns.ShowMinimapButton() end, set = function(v) ns.db.minimap = v and true or false end,
 	after = function() ns.Alerts:Draw() end })
 app:Setting({ key = "tooltip", type = "bool", label = "Show \"Tameable\" on wild beasts' tooltips",
 	desc = "The beast's family, its level and what its family learns.",

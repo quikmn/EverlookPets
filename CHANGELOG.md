@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The minimap button is off by default when Everlook Bar is loaded, since its Everlook Pets plugin on the bar shows the same count. Turn it back on in Settings (or `/epets minimap on`); if you had switched it off, it stays off.
+- The minimap button no longer jumps around when a button drawer (Everlook Bar's, for one) has collected it.
+
 ## v0.3.0 (2026-11-19)
 
 - **Bestiary**, a new page in `/epets`: every tameable beast as a card with its family, levels, zones, attack speed and a chip for each rank it teaches (gold when your pet would gain it; the edge says confirmed, seen in WoW Forever or classic data). Search "bite 6", "cat", "stranglethorn" or "rare" in the box at the top, and filter by family, zone, near your level, rare, fast attack, untamed by you or your wishlist. `/epets beasts bite 6` opens it with that search.

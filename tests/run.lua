@@ -497,7 +497,14 @@ step("chat commands: help, check, a setting, status, a typo", function()
 	check(has(logSince(mark), "again within 10"), "reset asks first")
 	slash("reset")
 	eq(ns.db.lagWarn, 3, "reset done")
-	eq(ns.db.minimap, true)
+	eq(ns.db.minimap, "auto", "minimap back to automatic")
+	check(ns.ShowMinimapButton(), "auto without Everlook Bar: shown")
+	MOCK.loaded.EverlookBar = true
+	check(not ns.ShowMinimapButton(), "auto with Everlook Bar: off (its plugin shows the count)")
+	slash("minimap on")
+	check(ns.ShowMinimapButton() and ns.db.minimap == true, "switched on by hand: shown even with Everlook Bar")
+	MOCK.loaded.EverlookBar = nil
+	ns.db.minimap = "auto"
 end)
 
 step("tooltip: tameable beasts", function()

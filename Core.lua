@@ -66,7 +66,7 @@ end
 ns.DEFAULTS = {
 	chat = true,        -- a chat line when something becomes actionable
 	lagWarn = 3,        -- say so when the pet is this many levels below you (0: never)
-	minimap = true,     -- the minimap button
+	minimap = "auto",   -- the minimap button: true, false, or "auto" (shown unless Everlook Bar is loaded: its plugin shows the same)
 	angle = 200,        -- where the minimap button sits around the minimap (degrees)
 	tooltip = true,     -- "Tameable" lines on beasts' tooltips
 	showLocked = true,  -- list abilities that open at a higher pet level
@@ -315,6 +315,16 @@ function ns.RecordTame(npc, n)
 	ns.cdb.tamed[npc] = math.max(1, (ns.cdb.tamed[npc] or 0) + (n or 1))
 end
 
+-- Is the minimap button wanted? "auto": yes, unless Everlook Bar is loaded (its bar plugin shows the same count).
+function ns.ShowMinimapButton()
+	local v = ns.db and ns.db.minimap
+	if v == "auto" or v == nil then
+		local loaded = ns.Call(api("C_AddOns", "IsAddOnLoaded"), "EverlookBar") or ns.Call(_G.IsAddOnLoaded, "EverlookBar")
+		return not loaded
+	end
+	return v == true
+end
+
 function ns.IsWished(npc) return ns.cdb and ns.cdb.wishlist and ns.cdb.wishlist[npc] and true or false end
 function ns.SetWished(npc, on)
 	if not (npc and ns.cdb) then return end
@@ -379,6 +389,12 @@ ns.On("ADDON_LOADED", function(_, name)
 	_G[ns.SAVED] = fill(type(_G[ns.SAVED]) == "table" and _G[ns.SAVED] or {}, ns.DEFAULTS)
 	_G[ns.SAVED_CHAR] = fill(type(_G[ns.SAVED_CHAR]) == "table" and _G[ns.SAVED_CHAR] or {}, ns.CHAR_DEFAULTS)
 	ns.db, ns.cdb = _G[ns.SAVED], _G[ns.SAVED_CHAR]
+	-- 2026-11-19: the minimap button's default became "auto" (off while Everlook Bar is loaded). Saved settings from
+	-- before have the old default written in (true); a switched-off button (false) stays off.
+	if (tonumber(ns.db.version) or 1) < 2 then
+		if ns.db.minimap == true then ns.db.minimap = "auto" end
+		ns.db.version = 2
+	end
 	if ns.OnLoaded then ns.OnLoaded() end
 end)
 

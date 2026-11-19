@@ -213,6 +213,8 @@ function A:SetupMinimap()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	b:SetScript("OnDragStart", function(self)
+		-- collected by a button drawer (Everlook Bar, MinimapButtonBag...): it is not ours to move around the minimap
+		if self:GetParent() ~= Minimap then return end
 		self:SetScript("OnUpdate", function()
 			local mx, my = Minimap:GetCenter()
 			local scale = Minimap:GetEffectiveScale()
@@ -234,9 +236,10 @@ function A:Draw()
 		local fam = ns.state.result and ns.state.result.family
 		ldb.icon = fam and fam.icon or ns.ICON
 	end
-	if not button and ns.db and ns.db.minimap and ns.state.hunter then self:SetupMinimap() end
+	local want = ns.db and ns.ShowMinimapButton() and ns.state.hunter and true or false
+	if not button and want then self:SetupMinimap() end
 	if button then
-		button:SetShown(ns.db.minimap and ns.state.hunter and true or false)
+		button:SetShown(want)
 		local n = self:Unseen()
 		button.badge:SetShown(n > 0)
 		button.badge.text:SetText(n > 9 and "9+" or tostring(n))
