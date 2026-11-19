@@ -14,6 +14,7 @@ local app = UI:NewApp({
 	aliases = { "/everlookpets" },
 	feedbackURL = "https://everlookdb.com/everlook-pets.html#feedback",
 	frameName = ns.PREFIX,
+	accent = { 0.671, 0.831, 0.451 }, -- hunter green (#abd473), the class colour
 	tagline = "Your hunter pet's abilities: what it has, what its level allows, and how to get the next rank.",
 	position = function() return ns.db end,
 	onShow = function() ns:Update(); ns.Alerts:MarkSeen(); ns.Browser.LightBestiary() end,
