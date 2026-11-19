@@ -837,6 +837,27 @@ step("no pet, then not a hunter", function()
 	ns:Update()
 end)
 
+step("renaming your pet moves what was saved about it (no orphans under the old name)", function()
+	local saved = { name = MOCK.pet.name, guid = MOCK.petGUID }
+	MOCK.petGUID = "Pet-0-4372-1-14-681-0200ABCDEF"
+	ns:Update()
+	local oldKey = ns.state.pet.key
+	ns.cdb.alerted[oldKey] = ns.cdb.alerted[oldKey] or { x = true }
+	ns.cdb.lagNoted[oldKey] = true
+	MOCK.pet.name = "Whiskers"
+	ns:Update()
+	local newKey = ns.state.pet.key
+	check(newKey ~= oldKey, "new key")
+	eq(ns.cdb.pets[oldKey], nil, "old pet entry")
+	eq(ns.cdb.alerted[oldKey], nil, "old alerted entry")
+	eq(ns.cdb.lagNoted[oldKey], nil, "old lag note")
+	check(ns.cdb.pets[newKey] and ns.cdb.pets[newKey].name == "Whiskers", "new entry")
+	check(ns.cdb.lagNoted[newKey], "lag note moved")
+	MOCK.pet.name, MOCK.petGUID = saved.name, saved.guid
+	ns.cdb.pets[newKey], ns.cdb.alerted[newKey], ns.cdb.lagNoted[newKey], ns.cdb.unseen[newKey] = nil, nil, nil, nil
+	ns:Update()
+end)
+
 step("in combat: happiness, pet bar and spell events wait for the end of the fight; map pins too", function()
 	flush()
 	local refreshes = 0

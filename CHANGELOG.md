@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Renaming your pet keeps what Everlook Pets knew about it (what it was told about, what's new) instead of leaving an old entry behind under the old name. Old entries for pets you no longer have are cleared when you open the stable.
 - On characters that aren't hunters, Everlook Pets now stays idle: it no longer watches nameplates, targets and mouse-overs, and it puts no "Hunters only" plugin on your bars. The Bestiary (`/epets beasts`) still works on every character.
 - Lighter in combat: your pet's happiness, the pet bar and spell updates no longer make Everlook Pets re-check everything during a fight; it checks once when combat ends, and the world map's pins update then too.
 - Rare and wishlist alerts: the chat line has clickable [Waypoint] (to its nearest known spawn spot) and [Beast page] links instead of a "/tar Name" to retype. To target the beast, bind a key under Key Bindings > AddOns > Everlook Pets ("Target the beast from the last rare / wishlist alert"); the line then says which key. The sound is a soft ping now; the raid warning sound is a setting ("Use the raid warning sound instead").

@@ -166,7 +166,8 @@ function ns.ReadPet()
 		end
 	end
 	p.spellCount = n or 0
-	p.npc = ns.PetNpcId((ns.Call(UnitGUID, "pet")))
+	p.guid = ns.Str((ns.Call(UnitGUID, "pet")))
+	p.npc = ns.PetNpcId(p.guid)
 	-- the game's name for its family, in your language
 	if p.familyId and p.familyName then
 		ns.familyNames = ns.familyNames or {}
@@ -189,11 +190,35 @@ end
 -- The pet's key in your saved pets: name and family.
 function ns.PetKey(p) return tostring(p.name or "?") .. "|" .. tostring(p.familyId or 0) end
 
--- Remember what one of your pets knows (only our abilities' spells), for "another pet knows it".
-local function remember(key, name, familyId, level, spells)
+-- Remember what one of your pets knows (only our abilities' spells), for "another pet knows it". guid: the pet's
+-- GUID when it is out (kept from before when not given), so a renamed pet is found again.
+local function remember(key, name, familyId, level, spells, guid)
 	local keep = {}
 	for id in pairs(spells) do if ns.rankOf[id] then keep[id] = true end end
-	ns.cdb.pets[key] = { name = name, family = familyId, level = level, spells = keep }
+	local old = ns.cdb.pets[key]
+	ns.cdb.pets[key] = { name = name, family = familyId, level = level, spells = keep, guid = guid or (old and old.guid) }
+end
+
+-- Everything saved per pet, by its key (name|family).
+local function perPet() return { ns.cdb.pets, ns.cdb.alerted, ns.cdb.unseen, ns.cdb.lagNoted } end
+
+-- A pet's saved entries move to its new key (you renamed it). What the new key already has stays.
+function ns.MovePet(old, new)
+	if old == new then return end
+	for _, t in ipairs(perPet()) do
+		if t[old] ~= nil and t[new] == nil then t[new] = t[old] end
+		t[old] = nil
+	end
+end
+
+-- The pet out now under another key with the same GUID: it was renamed. Move its entries over.
+function ns.FollowRename(p, key)
+	if not (p and p.guid and ns.cdb) then return end
+	local olds = {}
+	for k, rec in pairs(ns.cdb.pets) do
+		if k ~= key and type(rec) == "table" and rec.guid == p.guid then olds[#olds + 1] = k end
+	end
+	for _, k in ipairs(olds) do ns.MovePet(k, key) end
 end
 
 -- Your stabled and active pets as the stable shows them (only while it is open, or after it was opened).
@@ -218,9 +243,15 @@ function ns.ReadStable()
 			end
 		end
 	end
-	-- a pet you no longer have (abandoned) stops counting
+	-- a pet you no longer have (abandoned, or renamed elsewhere) stops counting, and what was said about it goes
 	if any then
-		for key in pairs(ns.cdb.pets) do if not seen[key] then ns.cdb.pets[key] = nil end end
+		local out = ns.state.pet and ns.state.pet.key
+		if out then seen[out] = true end -- the pet out now always stays
+		for _, t in ipairs(perPet()) do
+			local gone = {}
+			for key in pairs(t) do if not seen[key] then gone[#gone + 1] = key end end
+			for _, key in ipairs(gone) do t[key] = nil end
+		end
 	end
 end
 
@@ -350,7 +381,8 @@ function ns:Update()
 		if p then
 			local key = ns.PetKey(p)
 			p.key = key
-			if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows) end
+			ns.FollowRename(p, key)
+			if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows, p.guid) end
 			-- a pet you have came from a tame of yours: "tamed by you" in the bestiary
 			if p.npc and ns.cdb and not ns.cdb.tamed[p.npc] then ns.RecordTame(p.npc, 0) end
 			st.result = ns.Logic.Evaluate(ns.Data, {
