@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 (2026-11-19)
 
 - **Bestiary**, a new page in `/epets`: every tameable beast as a card with its family, levels, zones, attack speed and a chip for each rank it teaches (gold when your pet would gain it; the edge says confirmed, seen in WoW Forever or classic data). Search "bite 6", "cat", "stranglethorn" or "rare" in the box at the top, and filter by family, zone, near your level, rare, fast attack, untamed by you or your wishlist. `/epets beasts bite 6` opens it with that search.
 - Click a beast for its page: its 3D model, levels, attack speed, what it eats, where it lives and spawns, each rank it teaches with what it costs in training points, and **Set waypoint** (TomTom's waypoint when TomTom is loaded, else the game's own map pin and arrow). A link to its EverlookDB page too.
