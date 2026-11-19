@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Everlook Pets
-## Notes: Hunter pets: your pet's abilities, the best rank its level allows, and how to get the next one (train, buy or tame). /epets
+## Notes: Hunter pets: your pet's abilities and how to get the next rank, a bestiary of tameable beasts with a wishlist, and map pins. /epets
 ## Author: quikmn
 ## Version: 0.2.0
 ## SavedVariables: EverlookPetsDB
@@ -16,7 +16,12 @@ Libs\EverlookUI\EverlookUI.lua
 Libs\EverlookUI\EverlookTooltip.lua
 Data.lua
 Logic.lua
+Bestiary.lua
 Core.lua
 Alerts.lua
 Tooltip.lua
+Cards.lua
+Browser.lua
 Options.lua
+MapPins.lua
+MapPins.xml

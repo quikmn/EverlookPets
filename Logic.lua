@@ -245,8 +245,9 @@ end
 
 -- The beasts to tame for one rank, best first, at most n (default 5). where = { level, zone, continent } (any may be
 -- nil). Order: one you can tame at your level before one too high for you, then confirmed before seen before
--- classic data, then in your zone, then your continent, then nearest your level.
-function L.Teachers(D, spell, where, n)
+-- classic data, then in your zone, then your continent, then nearest your level. With order "near" the zone comes
+-- before how sure the rank is (your pet page: the nearest beast you can tame, confirmed first among equals).
+function L.Teachers(D, spell, where, n, order)
 	local ids = D.teachers and D.teachers[spell]
 	if not ids then return {} end
 	where = where or {}
@@ -269,6 +270,7 @@ function L.Teachers(D, spell, where, n)
 	end
 	table.sort(out, function(a, b)
 		if a.tooHigh ~= b.tooHigh then return not a.tooHigh end
+		if order == "near" and a.place ~= b.place then return a.place < b.place end
 		if a.n ~= b.n then return a.n > b.n end
 		if a.place ~= b.place then return a.place < b.place end
 		if a.dist ~= b.dist then return a.dist < b.dist end

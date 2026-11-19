@@ -37,6 +37,8 @@ function ns.TameLines(npcId, familyName, playerLevel)
 	out.learns = table.concat(learns, ", ")
 	out.teaches, out.teachesFrom = ns.Logic.TeachesText(ns.Data, npcId, ns.AbilityName)
 	if playerLevel and lo > playerLevel then out.tooHigh = lo end
+	out.tamed = ns.cdb and ns.cdb.tamed and ns.cdb.tamed[npcId] or nil
+	out.wished = ns.IsWished(npcId)
 	return out
 end
 
@@ -50,6 +52,9 @@ Tip:Register({
 		if not lines then return end
 		t:Line(lines.label, lines.value, { note = lines.note })
 		if lines.tooHigh then t:Detail("Too high for you until level " .. lines.tooHigh, nil, { always = true }) end
+		if lines.tamed or lines.wished then
+			t:Detail(lines.tamed and "Tamed by you" or "On your wishlist", lines.tamed and lines.wished and "on your wishlist" or nil, { always = true })
+		end
 		if lines.teaches then
 			local mark = ns.Logic.STATE_LABEL[lines.teachesFrom] or lines.teachesFrom
 			t:Line("Teaches", lines.teaches, { note = mark })

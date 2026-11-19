@@ -1,5 +1,6 @@
 -- Everlook Pets: the window (/epets), its settings (also from chat) and the chat commands.
--- Pages: "Your pet" (status and every ability with what to do next), "Settings", "Data and links".
+-- Pages: "Your pet" (status, what it can still learn best first, every ability with what to do next), "Bestiary"
+-- and the beast page (Browser.lua), "Settings", "Data and links".
 local ADDON, ns = ...
 local UI = ns.UI
 local Logic = ns.Logic
@@ -15,7 +16,7 @@ local app = UI:NewApp({
 	frameName = ns.PREFIX,
 	tagline = "Your hunter pet's abilities: what it has, what its level allows, and how to get the next rank.",
 	position = function() return ns.db end,
-	onShow = function() ns:Update(); ns.Alerts:MarkSeen() end,
+	onShow = function() ns:Update(); ns.Alerts:MarkSeen(); ns.Browser.LightBestiary() end,
 })
 ns.app = app
 local T = app.T
@@ -45,6 +46,26 @@ app:Setting({ key = "tooltip", type = "bool", label = "Show \"Tameable\" on wild
 	desc = "The beast's family, its level and what its family learns.",
 	keywords = { "tame", "beast", "mouseover" },
 	get = function() return ns.db.tooltip end, set = function(v) ns.db.tooltip = v end })
+app:Setting({ key = "rare", type = "bool", label = "Tell me when a rare tameable beast is near",
+	desc = "One chat line (once in 5 minutes per beast) when its nameplate, your target or your mouse-over shows it. Turn on enemy nameplates to hear about it from afar.",
+	keywords = { "rare", "alert", "nameplate", "spawn", "camp" },
+	get = function() return ns.db.rareAlert end, set = function(v) ns.db.rareAlert = v end })
+app:Setting({ key = "wish", type = "bool", label = "Tell me when a beast on my wishlist is near",
+	desc = "Star beasts on the Bestiary page; you hear about them the same way as rare ones.",
+	keywords = { "wishlist", "star", "favorite", "alert" },
+	get = function() return ns.db.wishAlert end, set = function(v) ns.db.wishAlert = v end })
+app:Setting({ key = "sound", type = "bool", label = "Play a sound with those lines",
+	keywords = { "sound", "audio", "warning" },
+	get = function() return ns.db.alertSound end, set = function(v) ns.db.alertSound = v end })
+app:Setting({ key = "models", type = "bool", label = "3D model on the beast page",
+	desc = "Off saves a little memory and time when you open a beast's page.",
+	keywords = { "model", "3d", "performance", "picture" },
+	get = function() return ns.db.models end, set = function(v) ns.db.models = v end })
+app:Setting({ key = "map", type = "bool", label = "Tameable beasts on the world map",
+	desc = "Pins for beasts that teach a rank your pet lacks and that you can tame at your level; the edge colour says how sure the rank is. The world map has the same switch.",
+	keywords = { "map", "pins", "world map", "spawn", "where" },
+	get = function() return ns.db.mapPins end, set = function(v) ns.db.mapPins = v end,
+	after = function() if ns.MapPins then ns.MapPins:Refresh() end end })
 app:Setting({ key = "locked", type = "bool", label = "List abilities that open at a higher pet level",
 	keywords = { "later", "future", "hide" },
 	get = function() return ns.db.showLocked end, set = function(v) ns.db.showLocked = v end,
@@ -141,6 +162,71 @@ function O:ShowWhere(row)
 	return lines, url
 end
 
+------------------------------------------------------------------------
+-- Your pet: what it can still learn (Bestiary.lua sorts it)
+------------------------------------------------------------------------
+function O.FreePoints()
+	local p = ns.state.pet
+	if not (p and p.tpTotal) then return nil end
+	return p.tpTotal - (p.tpUsed or 0)
+end
+
+function O.LearnItems()
+	return ns.Bestiary.StillToLearn(ns.Data, ns.state.result, ns.Where(), O.FreePoints())
+end
+
+-- "75 training points free. Next: Bite 4 costs 10 (3 for your pet, which has rank 3)."
+function O.PointsLine()
+	local st = ns.state
+	if not (st.pet and st.result and st.result.family) then return "" end
+	local free = O.FreePoints()
+	local s = free and (("%d training point%s free."):format(free, free == 1 and "" or "s")) or "Training points: not known."
+	for _, it in ipairs(O.LearnItems()) do
+		if it.cost then
+			s = s .. (" Next: %s %d costs %d"):format(it.row.name, it.row.target.rank, it.cost)
+			if it.net and it.net ~= it.cost then s = s .. (" (%d for your pet, which has rank %d)"):format(it.net, it.row.haveRank) end
+			if it.fits == false then s = s .. ", |cffef5d5dmore than you have|r" end
+			return s .. "."
+		end
+	end
+	return s .. " What these ranks cost isn't known yet."
+end
+
+function O.LearnTitle(it)
+	local row = it.row
+	local s = ("%s %d"):format(row.name, row.target.rank)
+	s = s .. "  |cff8d94a3" .. (row.haveRank > 0 and ("your pet has " .. row.haveRank) or "new for your pet")
+	if it.cost then s = s .. " · " .. (it.net or it.cost) .. " TP" end
+	s = s .. "|r"
+	if it.fits == false then s = s .. "  |cffef5d5d(not enough points)|r" end
+	return s
+end
+
+function O.LearnSub(it)
+	local s = (COLORS[it.row.state] or "") .. (Logic.Describe(it.row)) .. "|r"
+	if it.row.state == "tame" and (it.beastCount or 0) == 0 then s = s .. "  |cff8d94a3(no beast known yet)|r" end
+	return s
+end
+
+function O.LearnChips(it)
+	local out = {}
+	for _, b in ipairs(it.beasts or {}) do
+		local edge = (b.state == "confirmed" and T.ok) or (b.state == "seen" and T.text) or T.border
+		local lv = b.lo > 0 and (b.hi > b.lo and (b.lo .. "-" .. b.hi) or tostring(b.lo)) or "?"
+		local zone = b.zone and b.zone ~= 0 and ns.Bestiary.ZoneName(ns.Data, b.zone, ns.MapName) or nil
+		out[#out + 1] = { text = b.name .. " " .. lv .. (zone and (" · " .. zone) or ""), edge = edge,
+			color = b.tooHigh and T.danger or T.text,
+			tip = { b.name, Logic.TeacherLine(b), b.tooHigh and ("Too high for you until level " .. b.lo) or "Click for its page." },
+			onClick = function() ns.Browser.OpenBeast(b.id) end }
+	end
+	if it.beastCount and it.beastCount > #out then
+		out[#out + 1] = { text = ("+%d more"):format(it.beastCount - #out), color = T.muted, edge = T.border,
+			tip = { "Every beast that teaches it", "Opens the Bestiary with this rank searched." },
+			onClick = function() ns.Browser.OpenSearch(it.row.name .. " " .. it.row.target.rank) end }
+	end
+	return out
+end
+
 app:Section("pet", "Your pet", function(stack)
 	UI.Header(stack, "Your pet")
 	UI.Note(stack, function()
@@ -191,7 +277,30 @@ app:Section("pet", "Your pet", function(stack)
 			end },
 	})
 
-	UI.Header(stack, "Abilities", "What your pet has, the best rank its level allows, and how to get it. Things to do come first; hover a row for more.")
+	UI.Header(stack, "Still to learn", "Most worth it first: what you can do right now, then the biggest jump in rank, then the fewest "
+		.. "training points. For a tame, the 3 nearest beasts you can tame (confirmed first); click one for its page.")
+	UI.Note(stack, O.PointsLine)
+	O.learn = ns.Cards(stack, {
+		items = O.LearnItems,
+		icon = function(it) return ns.AbilityIcon(it.row.ability, it.row.target) end,
+		title = O.LearnTitle,
+		sub = O.LearnSub,
+		chips = O.LearnChips,
+		tooltip = function(it) return O.RowTooltip(it.row) end,
+		onClick = function(it) ns.Browser.OpenSearch(it.row.name .. " " .. it.row.target.rank) end,
+		buttons = {
+			{ label = "Where?", width = 70, shown = function(it) return it.row.state == "tame" or it.row.state == "forever" end,
+				onClick = function(it) O:ShowWhere(it.row) end },
+		},
+		empty = function()
+			local st = ns.state
+			if not (st.pet and st.result and st.result.family) then return "Call your pet to see what it can still learn." end
+			return "Nothing: every ability is as good as your pet's level allows."
+		end,
+		page = 30,
+	})
+
+	UI.Header(stack, "Every ability", "What your pet has, the best rank its level allows, and how to get it. Things to do come first; hover a row for more.")
 	O.list = UI.List(stack, {
 		rowHeight = 44,
 		items = O.Rows,
@@ -208,6 +317,11 @@ app:Section("pet", "Your pet", function(stack)
 end)
 
 ------------------------------------------------------------------------
+-- Page: bestiary (Browser.lua)
+------------------------------------------------------------------------
+ns.Browser.AddBestiary(app)
+
+------------------------------------------------------------------------
 -- Page: settings
 ------------------------------------------------------------------------
 app:Section("settings", "Settings", function(stack)
@@ -215,12 +329,19 @@ app:Section("settings", "Settings", function(stack)
 	app:Widget(stack, "chat")
 	app:Widget(stack, "lag")
 	app:Widget(stack, "minimap")
-	UI.Header(stack, "Window and tooltips")
+	UI.Header(stack, "Beasts near you")
+	app:Widget(stack, "rare")
+	app:Widget(stack, "wish")
+	app:Widget(stack, "sound")
+	UI.Header(stack, "Window, map and tooltips")
 	app:Widget(stack, "locked")
+	app:Widget(stack, "models")
+	app:Widget(stack, "map")
 	app:Widget(stack, "tooltip")
 	UI.Header(stack, "Chat commands")
 	UI.Note(stack, ns.SLASH .. "  this window\n" .. ns.SLASH .. " check  what to do now, in chat\n" .. ns.SLASH
 		.. " chat off, lag 5, minimap off, tooltip off  change a setting\n" .. ns.SLASH .. " get  every setting\n"
+		.. ns.SLASH .. " beasts <words>  the Bestiary with that search (bite 6, cat, rare)\n" .. ns.SLASH .. " wishlist  your starred beasts\n"
 		.. ns.SLASH .. " search <words>  find a setting\n" .. ns.SLASH .. " status, version, help")
 end)
 
@@ -235,6 +356,10 @@ app:Section("data", "Data and links", function(stack)
 		.. "Efficient Games, Forever Hunter Pets, BeastScout) and, where nobody has reported a beast yet, classic data (VMaNGOS). "
 		.. "Each rank says how sure it is: |cff62cf88confirmed|r (two sources agree, or several tames), seen in WoW Forever "
 		.. "(one source), or |cff8d94a3classic data|r (WoW Forever may differ). The game files WoW Forever ships don't have it.")
+	UI.Note(stack, "Where beasts spawn: where WoW Forever players found them (Forever Hunter Pets, MIT), else classic-db's "
+		.. "spawn points (Classic 1.12, GPL-3.0). Models, names, levels and rare or elite: the game's data on EverlookDB. Training "
+		.. "point costs: Beast Training as Forever Hunter Pets (MIT) and EG Link players (CC BY 4.0) read it. Tamed by you "
+		.. "and your wishlist stay on your computer, per character.")
 	UI.CopyBox(stack, "EverlookDB pets", function() return siteURL() end)
 	UI.CopyBox(stack, "Petopia abilities", Logic.PETOPIA .. "abilities.php")
 end)
@@ -256,12 +381,29 @@ app:Command("check", "check", "what to do for your pet now, in chat", function()
 	if lag then ns:Print(lag .. ".") end
 end, { "todo" })
 
+app:Command("beasts", "beasts [words]", "the Bestiary, with a search (bite 6, cat, stranglethorn, rare)", function(rest)
+	ns.Browser.OpenSearch(tostring(rest or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+end, { "bestiary", "find" })
+
+app:Command("wishlist", "wishlist", "the beasts you starred, in chat", function()
+	local list = {}
+	for id in pairs(ns.cdb and ns.cdb.wishlist or {}) do
+		local e = ns.Bestiary.Get(ns.Data, id)
+		if e then list[#list + 1] = e end
+	end
+	table.sort(list, function(a, b) return a.lo < b.lo end)
+	if #list == 0 then ns:Print("your wishlist is empty: star beasts on the Bestiary page (" .. ns.SLASH .. " beasts).") return end
+	for _, e in ipairs(list) do
+		ns:Print(("%s, level %s, %s"):format(e.name, ns.Bestiary.Levels(e), ns.Bestiary.ZoneName(ns.Data, e.zones[1] or "where not known", ns.MapName)))
+	end
+end, { "wish" })
+
 app:StatusLines(function()
 	local st = ns.state
 	if not st.hunter then return { "Not a hunter: nothing to track." } end
-	if not st.pet then return { "No pet out." } end
+	if not st.pet then return { "No pet out.", ns.MapPins:Status() } end
 	return { ("%s, level %s: %d thing%s to do."):format(st.pet.name or "Pet", st.pet.level or "?", st.result and st.result.todo or 0,
-		(st.result and st.result.todo or 0) == 1 and "" or "s") }
+		(st.result and st.result.todo or 0) == 1 and "" or "s"), ns.MapPins:Status() }
 end)
 
 app:Reset(nil, "every " .. ns.NAME .. " setting", function()
@@ -270,6 +412,11 @@ app:Reset(nil, "every " .. ns.NAME .. " setting", function()
 	ns.Alerts:Draw()
 	app:Refresh()
 end)
+
+------------------------------------------------------------------------
+-- Page: one beast (Browser.lua), last: it has no sidebar entry
+------------------------------------------------------------------------
+ns.Browser.AddBeast(app)
 
 -- Runs once the saved settings are loaded (Core.lua, ADDON_LOADED).
 function ns.OnLoaded()

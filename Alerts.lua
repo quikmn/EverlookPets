@@ -59,6 +59,48 @@ function A:Check(st)
 end
 
 ------------------------------------------------------------------------
+-- A rare tameable beast, or one on your wishlist, is near: one chat line (and a sound), at most once in
+-- A.NEAR_AGAIN seconds per beast. Seen through nameplates (enemy nameplates on), your target and your mouse-over.
+------------------------------------------------------------------------
+A.NEAR_AGAIN = 300
+A.nearSaid = {}
+
+-- What to say about this beast near you, or nil. npc id, classification (the game's word), your level, wished.
+function A.NearLine(npc, classification, playerLevel, wished)
+	local e = ns.Bestiary.Get(ns.Data, npc)
+	if not e then return nil end
+	local rare = classification == "rare" or classification == "rareelite" or (classification == nil and e.rare)
+	if not ((rare and ns.db.rareAlert) or (wished and ns.db.wishAlert)) then return nil end
+	local what = (rare and "rare " or "") .. (ns.FamilyName(e.family) or e.famKey)
+	local s = ("%s (%s, level %s) is near"):format(e.name, what, ns.Bestiary.Levels(e))
+	if wished then s = s .. ", and it's on your wishlist" end
+	if playerLevel and e.lo > playerLevel then s = s .. (". Too high for you until level %d"):format(e.lo) end
+	return s .. ". /tar " .. e.name
+end
+
+function A:SeeUnit(unit)
+	if not (ns.db and ns.state.hunter) then return end
+	-- in combat and instances the game may hide these (secret values): then we skip the unit
+	local npc = ns.NpcId and ns.NpcId(ns.Str((ns.Call(UnitGUID, unit))))
+	if not npc or ns.Bool((ns.Call(UnitIsDead, unit))) ~= false then return end
+	local now = ns.Num((ns.Call(GetTime))) or 0
+	local last = self.nearSaid[npc]
+	if last and now - last < self.NEAR_AGAIN then return end
+	local line = self.NearLine(npc, ns.Str((ns.Call(UnitClassification, unit))), ns.state.playerLevel, ns.IsWished(npc))
+	if not line then return end
+	self.nearSaid[npc] = now
+	ns:Print(GOLD .. line .. "|r")
+	if ns.db.alertSound then
+		local play = ns.api("C_Sound", "PlaySound")
+		if not ns.Call(play, 8959, "SFX") then ns.Call(_G.PlaySound, 8959, "Master") end -- the raid warning sound
+	end
+end
+
+ns.On("NAME_PLATE_UNIT_ADDED", function(_, unit) A:SeeUnit(unit) end)
+ns.On("PLAYER_TARGET_CHANGED", function() A:SeeUnit("target") end)
+ns.On("UPDATE_MOUSEOVER_UNIT", function() A:SeeUnit("mouseover") end)
+
+------------------------------------------------------------------------
 -- Summary text, shared by the plugin, the minimap button and its tooltip
 ------------------------------------------------------------------------
 function A:Summary()

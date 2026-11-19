@@ -37,6 +37,12 @@ function ns.Str(v)
 	return v
 end
 
+-- A plain boolean, or nil.
+function ns.Bool(v)
+	if v == nil or issecret(v) or type(v) ~= "boolean" then return nil end
+	return v
+end
+
 local function after(ok, ...)
 	if ok then return ... end
 	return nil
@@ -64,8 +70,14 @@ ns.DEFAULTS = {
 	angle = 200,        -- where the minimap button sits around the minimap (degrees)
 	tooltip = true,     -- "Tameable" lines on beasts' tooltips
 	showLocked = true,  -- list abilities that open at a higher pet level
+	rareAlert = true,   -- a chat line when a rare tameable beast is near
+	wishAlert = true,   -- ... and when a beast on your wishlist is
+	alertSound = true,  -- with a sound
+	models = true,      -- 3D models on the beast page
+	mapPins = true,     -- "Tameable beasts" pins on the world map
 }
-ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {} }
+-- wishlist: { [npc id] = true } (the bestiary's star); tamed: { [npc id] = times } (your own tames, for "tamed by you")
+ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {} }
 
 local function fill(dst, defaults)
 	for k, v in pairs(defaults) do
@@ -153,6 +165,12 @@ function ns.ReadPet()
 		end
 	end
 	p.spellCount = n or 0
+	p.npc = ns.PetNpcId((ns.Call(UnitGUID, "pet")))
+	-- the game's name for its family, in your language
+	if p.familyId and p.familyName then
+		ns.familyNames = ns.familyNames or {}
+		ns.familyNames[p.familyId] = p.familyName
+	end
 	return p
 end
 
@@ -237,6 +255,72 @@ function ns.Where()
 	return out
 end
 
+-- Where exactly you are: { map, x, y (0-1), zone, continent, level }; nil fields when unknown.
+function ns.Here()
+	local w = ns.Where()
+	local map = ns.Num((ns.Call(api("C_Map", "GetBestMapForUnit"), "player")))
+	w.map = map
+	local pos = map and ns.Call(api("C_Map", "GetPlayerMapPosition"), map, "player")
+	if type(pos) == "table" and not issecret(pos) and type(pos.GetXY) == "function" then
+		local x, y = ns.Call(pos.GetXY, pos)
+		w.x, w.y = ns.Num(x), ns.Num(y)
+	end
+	return w
+end
+
+-- A map's name in your language (the game's), or nil.
+function ns.MapName(id)
+	if type(id) ~= "number" then return nil end
+	local mi = ns.Call(api("C_Map", "GetMapInfo"), id)
+	return type(mi) == "table" and ns.Str(mi.name) or nil
+end
+
+-- A family's name in your language when the game told us (your pets), else our English one.
+function ns.FamilyName(id)
+	local f = ns.Data.families[id or 0]
+	if not f then return nil end
+	return ns.familyNames and ns.familyNames[id] or f.key
+end
+
+-- A waypoint to map x, y (0-1): TomTom's when TomTom is loaded, else the game's own (the map pin and the arrow on
+-- your screen). Returns "tomtom", "game" or nil (this map takes no waypoint).
+function ns.SetWaypoint(map, x, y, title)
+	if not (map and x and y) then return nil end
+	local tt = _G.TomTom
+	if type(tt) == "table" and type(tt.AddWaypoint) == "function" then
+		local ok = pcall(tt.AddWaypoint, tt, map, x, y, { title = title, from = ns.NAME, persistent = false })
+		if ok then return "tomtom" end
+	end
+	if ns.Call(api("C_Map", "CanSetUserWaypointOnMap"), map) ~= true then return nil end
+	local P = _G.UiMapPoint
+	local point = type(P) == "table" and ns.Call(P.CreateFromCoordinates, map, x, y)
+	if not point then return nil end
+	if ns.Call(api("C_Map", "SetUserWaypoint"), point) == false then return nil end
+	ns.Call(api("C_SuperTrack", "SetSuperTrackedUserWaypoint"), true)
+	return "game"
+end
+
+-- The npc id a pet came from: a tamed pet's GUID keeps it ("Pet-0-4372-1-14-3068-0200ABCDEF" -> 3068).
+function ns.PetNpcId(guid)
+	if type(guid) ~= "string" or issecret(guid) then return nil end
+	local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+	if kind ~= "Pet" and kind ~= "Creature" then return nil end
+	return tonumber(id)
+end
+
+-- "Tamed by you": a tame of npc id (n more times; 0 just marks it, for a pet we see that we didn't watch you tame).
+function ns.RecordTame(npc, n)
+	if not (npc and ns.cdb and ns.cdb.tamed) then return end
+	if not (ns.Data.tameable[npc] or (ns.Data.beasts and ns.Data.beasts[npc])) then return end
+	ns.cdb.tamed[npc] = math.max(1, (ns.cdb.tamed[npc] or 0) + (n or 1))
+end
+
+function ns.IsWished(npc) return ns.cdb and ns.cdb.wishlist and ns.cdb.wishlist[npc] and true or false end
+function ns.SetWished(npc, on)
+	if not (npc and ns.cdb) then return end
+	ns.cdb.wishlist[npc] = on and true or nil
+end
+
 function ns.AbilityIcon(ab, rank)
 	local spell = (rank and rank.spell) or ab.ranks[1].spell
 	return ns.Num((ns.Call(api("C_Spell", "GetSpellTexture"), spell))) or ab.icon
@@ -256,6 +340,8 @@ function ns:Update()
 			local key = ns.PetKey(p)
 			p.key = key
 			if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows) end
+			-- a pet you have came from a tame of yours: "tamed by you" in the bestiary
+			if p.npc and ns.cdb and not ns.cdb.tamed[p.npc] then ns.RecordTame(p.npc, 0) end
 			st.result = ns.Logic.Evaluate(ns.Data, {
 				familyId = p.familyId, petLevel = p.level or 1, playerLevel = st.playerLevel,
 				petKnows = function(spell) return ns.PetKnows(p, spell) end,
@@ -268,6 +354,7 @@ function ns:Update()
 	ns.state = st
 	if ns.Alerts then ns.Alerts:Check(st) end
 	if ns.app and ns.app:IsShown() then ns.app:Refresh() end
+	if ns.MapPins then ns.MapPins:Refresh() end
 end
 
 -- Many events come in bursts (a level up fires five): update once, a moment later.
@@ -305,6 +392,22 @@ ns.On("PLAYER_LOGIN", function()
 	ns.On("UNIT_HAPPINESS", petOrPlayer)
 	ns.On("UNIT_PET_TRAINING_POINTS", petOrPlayer)
 	for _, e in ipairs({ "PLAYER_LEVEL_UP", "SPELLS_CHANGED", "PET_BAR_UPDATE", "LEARNED_SPELL_IN_SKILL_LINE" }) do ns.On(e, queue) end
+	-- Tame Beast (1515) on a target, then a new pet: that beast is tamed by you
+	local pending
+	ns.On("UNIT_SPELLCAST_CHANNEL_START", function(_, unit, _, spell)
+		if unit ~= "player" or ns.Num(spell) ~= 1515 then return end
+		local npc = ns.NpcId and ns.NpcId(ns.Str((ns.Call(UnitGUID, "target"))))
+		pending = npc and { npc = npc, at = ns.Num((ns.Call(GetTime))) or 0 } or nil
+	end)
+	ns.On("UNIT_PET", function(_, unit)
+		if unit ~= "player" or not pending then return end
+		local now = ns.Num((ns.Call(GetTime))) or 0
+		if now - pending.at <= 30 and ns.Call(UnitExists, "pet") then
+			local npc = ns.PetNpcId((ns.Call(UnitGUID, "pet")))
+			if npc == nil or npc == pending.npc then ns.RecordTame(pending.npc, 1) end
+			pending = nil
+		end
+	end)
 	local function stable() ns.ReadStable(); ns:Queue() end
 	ns.On("PET_STABLE_SHOW", stable)
 	ns.On("PET_STABLE_UPDATE", stable)

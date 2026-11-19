@@ -429,3 +429,56 @@ C_StableInfo = {
 	GetActivePetList = function() return MOCK.stableActive end,
 	GetStabledPetList = function() return MOCK.stabled end,
 }
+
+-- Everlook Pets 0.3: units around you, the map, waypoints, sounds and the world map canvas.
+MOCK.units = {} -- [unit] = { guid, class (classification), dead }
+MOCK.petGUID = nil
+UnitGUID = function(u)
+	if u == "pet" then return MOCK.pet and MOCK.petGUID or nil end
+	local d = MOCK.units[u]
+	return d and d.guid
+end
+UnitClassification = function(u) local d = MOCK.units[u]; return d and d.class or "normal" end
+UnitIsDead = function(u) local d = MOCK.units[u]; return d and d.dead or false end
+MOCK.mapInfo = { [1424] = { name = "Hillsbrad Foothills", mapType = 3, parentMapID = 1415 }, [1415] = { name = "Eastern Kingdoms", mapType = 2, parentMapID = 947 } }
+C_Map.GetMapInfo = function(id) return MOCK.mapInfo[id] end
+C_Map.CanSetUserWaypointOnMap = function(id) return type(id) == "number" and id > 0 end
+C_Map.SetUserWaypoint = function(p) MOCK.waypoint = p; return true end
+UiMapPoint = { CreateFromCoordinates = function(m, x, y) return { uiMapID = m, x = x, y = y } end }
+C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) MOCK.superTracked = on end }
+C_Sound = { PlaySound = function(id) MOCK.sounds = (MOCK.sounds or 0) + 1; MOCK.lastSound = id; return true end }
+
+-- The map canvas, as far as an addon's data provider and pins use it.
+function CreateFromMixins(...)
+	local t = {}
+	for i = 1, select("#", ...) do for k, v in pairs((select(i, ...))) do t[k] = v end end
+	return t
+end
+MapCanvasDataProviderMixin = {
+	GetMap = function(self) return self.owningMap end,
+	OnAdded = function(self, map) self.owningMap = map end,
+	RefreshAllData = function() end,
+	RemoveAllData = function() end,
+}
+MapCanvasPinMixin = {
+	SetPosition = function(self, x, y) self.normalizedX, self.normalizedY = x, y end,
+	OnLoad = function() end,
+}
+WorldMapFrame = newWidget("Frame", "WorldMapFrame", UIParent)
+WorldMapFrame.ScrollContainer = newWidget("Frame", nil, WorldMapFrame)
+WorldMapFrame.__shown = false
+WorldMapFrame.mapID = 1429
+WorldMapFrame.providers = {}
+WorldMapFrame.pins = {}
+function WorldMapFrame:AddDataProvider(p) table.insert(self.providers, p); p:OnAdded(self) end
+function WorldMapFrame:GetMapID() return self.mapID end
+function WorldMapFrame:RemoveAllPinsByTemplate(t) for _, pin in ipairs(self.pins) do pin:Hide() end; self.pins = {} end
+function WorldMapFrame:AcquirePin(template, ...)
+	local pin = newWidget("Frame", nil, self.ScrollContainer)
+	local mixin = _G[template:gsub("Template$", "Mixin")]
+	for k, v in pairs(mixin) do pin[k] = v end
+	pin:OnLoad()
+	pin:OnAcquired(...)
+	table.insert(self.pins, pin)
+	return pin
+end

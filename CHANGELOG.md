@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Bestiary**, a new page in `/epets`: every tameable beast as a card with its family, levels, zones, attack speed and a chip for each rank it teaches (gold when your pet would gain it; the edge says confirmed, seen in WoW Forever or classic data). Search "bite 6", "cat", "stranglethorn" or "rare" in the box at the top, and filter by family, zone, near your level, rare, fast attack, untamed by you or your wishlist. `/epets beasts bite 6` opens it with that search.
+- Click a beast for its page: its 3D model, levels, attack speed, what it eats, where it lives and spawns, each rank it teaches with what it costs in training points, and **Set waypoint** (TomTom's waypoint when TomTom is loaded, else the game's own map pin and arrow). A link to its EverlookDB page too.
+- A star puts a beast on your wishlist (per character; `/epets wishlist` lists them). You get one chat line and a sound when a rare tameable beast or one from your wishlist is near: on a nameplate, as your target or under your mouse. Once in 5 minutes per beast; each part can be turned off in Settings.
+- The addon remembers the beasts you tamed, so cards, beast pages and tooltips say "tamed by you", and the Bestiary can hide them.
+- Your pet's page starts with **Still to learn**: what's most worth it first (what you can do right now, the biggest jump in rank, the fewest training points), what each rank costs in training points, how many you have free, and for a tame the 3 nearest beasts you can tame at your level. Click a beast for its page.
+- The world map shows **Tameable beasts**: pins where beasts spawn that teach a rank your pet lacks and that you can tame at your level. Hover a pin for what it teaches, click it for its page. Switch them off on the map or in Settings.
+
 ## v0.2.0 (2026-11-18)
 
 - Settings: an AI help button copies a description of every setting for an AI assistant, and `/epets apply` runs the commands it gives back.
