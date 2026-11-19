@@ -168,16 +168,26 @@ function Br.OpenSearch(text)
 	app:Open("bestiary")
 end
 
--- A waypoint to the beast's best spot (nearest on your map, else on your continent). Returns what was set.
+-- A waypoint to the beast's best spot (nearest on your map, else on your continent). Returns what was set ("tomtom",
+-- "game" or nil), the spot and a line saying so. No chat line: the beast page shows the line under its buttons
+-- (Br.waypointNote), and the waypoint itself shows on the map and the screen.
 function Br.Waypoint(e, spot)
 	spot = spot or B.BestSpot(ns.Data, e, ns.Here())
-	if not spot then ns:Print("no spawn point known for " .. e.name .. ".") return nil end
+	local text
+	if not spot then
+		text = "No spawn point known for " .. e.name .. "."
+		Br.waypointNote = { id = e.id, text = text }
+		if app and app:IsShown() then app:Refresh() end
+		return nil, nil, text
+	end
 	local how = ns.SetWaypoint(spot.map, spot.x, spot.y, e.name)
 	local where = ("%s %.1f, %.1f"):format(B.ZoneName(ns.Data, spot.map, ns.MapName), spot.x * 100, spot.y * 100)
-	if how == "tomtom" then ns:Print("TomTom waypoint: " .. e.name .. ", " .. where .. ".")
-	elseif how == "game" then ns:Print("Waypoint: " .. e.name .. ", " .. where .. " (on your map and screen).")
-	else ns:Print("this map takes no waypoint. " .. e.name .. ": " .. where .. ".") end
-	return how, spot
+	if how == "tomtom" then text = "TomTom waypoint: " .. e.name .. ", " .. where .. "."
+	elseif how == "game" then text = "Waypoint: " .. e.name .. ", " .. where .. " (on your map and screen)."
+	else text = "This map takes no waypoint. " .. e.name .. ": " .. where .. "." end
+	Br.waypointNote = { id = e.id, text = text, ok = how ~= nil }
+	if app and app:IsShown() then app:Refresh() end
+	return how, spot, text
 end
 
 ------------------------------------------------------------------------
@@ -529,6 +539,12 @@ local function beastPage(stack)
 		end,
 	})
 	Br.beastButtons = row
+	-- what the last Set waypoint / Waypoint did (instead of a chat line)
+	UI.Note(stack, function()
+		local w, e = Br.waypointNote, Br.current
+		if not (w and e and w.id == e.id) then return "" end
+		return (w.ok and GREEN or MUTED) .. w.text .. "|r"
+	end)
 	modelBlock(stack)
 
 	UI.Header(stack, "What it teaches", "Each rank, how sure we are of it, and what it means for your pet.")

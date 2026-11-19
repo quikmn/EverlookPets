@@ -629,7 +629,8 @@ step("beast page: facts, what it teaches with costs, waypoints (the game's and T
 	Br.beastButtons.buttons[1].__scripts.OnClick(Br.beastButtons.buttons[1])
 	check(MOCK.waypoint and MOCK.waypoint.uiMapID == 1433, "waypoint in Redridge")
 	eq(MOCK.superTracked, true)
-	check(has(logSince(mark), "Waypoint: Greater Tarantula, Redridge Mountains"), table.concat(logSince(mark), " / "))
+	eq(#logSince(mark), 0, "no chat line for a waypoint: " .. table.concat(logSince(mark), " / "))
+	check(ns.Browser.waypointNote and ns.Browser.waypointNote.text:find("Waypoint: Greater Tarantula, Redridge Mountains", 1, true), "the page says it")
 	-- TomTom when it is loaded
 	TomTom = { AddWaypoint = function(self, m, x, y, opt) MOCK.tt = { m, x, y, opt.title }; return {} end }
 	local how = Br.Waypoint(Br.current, Br.current.spots[2])

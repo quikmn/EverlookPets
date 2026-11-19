@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Setting a waypoint no longer prints a chat line each time; the beast page says where it went, right under its buttons.
 - The minimap button is off by default when Everlook Bar is loaded, since its Everlook Pets plugin on the bar shows the same count. Turn it back on in Settings (or `/epets minimap on`); if you had switched it off, it stays off.
 - The minimap button no longer jumps around when a button drawer (Everlook Bar's, for one) has collected it.
 
