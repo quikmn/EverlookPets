@@ -72,7 +72,8 @@ ns.DEFAULTS = {
 	showLocked = true,  -- list abilities that open at a higher pet level
 	rareAlert = true,   -- a chat line when a rare tameable beast is near
 	wishAlert = true,   -- ... and when a beast on your wishlist is
-	alertSound = true,  -- with a sound
+	alertSound = true,  -- with a sound (a soft one: the map ping)
+	alertLoud = false,  -- ... the raid warning sound instead
 	models = true,      -- 3D models on the beast page
 	mapPins = true,     -- "Tameable beasts" pins on the world map
 }

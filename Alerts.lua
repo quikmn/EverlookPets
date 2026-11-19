@@ -59,11 +59,67 @@ function A:Check(st)
 end
 
 ------------------------------------------------------------------------
--- A rare tameable beast, or one on your wishlist, is near: one chat line (and a sound), at most once in
+-- A rare tameable beast, or one on your wishlist, is near: one chat line (and a soft sound), at most once in
 -- A.NEAR_AGAIN seconds per beast. Seen through nameplates (enemy nameplates on), your target and your mouse-over.
+-- The line has a [Waypoint] link (to its nearest known spawn spot). Targeting can't come from a chat link (the game
+-- allows it only from a key or a click on a secure button), so a key binding targets the beast from the last alert:
+-- Key Bindings > AddOns > Everlook Pets (Bindings.xml), through the secure button below.
 ------------------------------------------------------------------------
 A.NEAR_AGAIN = 300
 A.nearSaid = {}
+A.SOUND_SOFT, A.SOUND_LOUD = 3175, 8959 -- the map ping; the raid warning
+
+-- A chat link: |Haddon:EverlookPets:<action>:<npc>|h[label]|h. Clicks reach A.OnLink (EventRegistry "SetItemRef").
+function A.Link(action, npc, label)
+	return ("|cff71d5ff|Haddon:%s:%s:%d|h[%s]|h|r"):format(ns.PREFIX, action, npc, label)
+end
+
+function A.OnLink(link)
+	if type(link) ~= "string" then return false end
+	local action, npc = link:match("^addon:" .. ns.PREFIX .. ":(%a+):(%d+)")
+	npc = tonumber(npc)
+	if not npc then return false end
+	local e = ns.Bestiary.Get(ns.Data, npc)
+	if not e then return true end
+	if action == "wp" then
+		local how, _, text = ns.Browser.Waypoint(e)
+		if not how and text then ns:Print(text) end -- a waypoint shows on the map and the screen; only a miss is said
+	elseif action == "beast" then
+		ns.Browser.OpenBeast(e)
+	end
+	return true
+end
+local registry = _G.EventRegistry
+if type(registry) == "table" and type(registry.RegisterCallback) == "function" then
+	pcall(registry.RegisterCallback, registry, "SetItemRef", function(_, link) A.OnLink(link) end)
+end
+
+-- The secure button the key binding clicks: "/targetexact <name>" of the last beast an alert named. Its macro can
+-- only change out of combat; an alert in combat sets it when combat ends.
+A.TARGET_BUTTON = ns.PREFIX .. "TargetButton"
+A.BINDING = "CLICK " .. A.TARGET_BUTTON .. ":LeftButton"
+local targetButton = CreateFrame("Button", A.TARGET_BUTTON, UIParent, "SecureActionButtonTemplate")
+targetButton:Hide()
+targetButton:RegisterForClicks("AnyDown", "AnyUp")
+targetButton:SetAttribute("type", "macro")
+_G.BINDING_HEADER_EVERLOOKPETS = ns.NAME
+_G["BINDING_NAME_" .. A.BINDING] = "Target the beast from the last rare / wishlist alert"
+A.targetButton = targetButton
+local pendingTarget
+function A.SetTarget(name)
+	if not name then return end
+	if ns.Call(_G.InCombatLockdown) then pendingTarget = name return end
+	pendingTarget = nil
+	targetButton:SetAttribute("macrotext", "/targetexact " .. name)
+	A.targetName = name
+end
+ns.On("PLAYER_REGEN_ENABLED", function() if pendingTarget then A.SetTarget(pendingTarget) end end)
+
+-- The key bound to the target button, or nil.
+function A.TargetKey()
+	local key = ns.Call(_G.GetBindingKey, A.BINDING)
+	return ns.Str(key)
+end
 
 -- What to say about this beast near you, or nil. npc id, classification (the game's word), your level, wished.
 function A.NearLine(npc, classification, playerLevel, wished)
@@ -75,7 +131,22 @@ function A.NearLine(npc, classification, playerLevel, wished)
 	local s = ("%s (%s, level %s) is near"):format(e.name, what, ns.Bestiary.Levels(e))
 	if wished then s = s .. ", and it's on your wishlist" end
 	if playerLevel and e.lo > playerLevel then s = s .. (". Too high for you until level %d"):format(e.lo) end
-	return s .. ". /tar " .. e.name
+	return s .. "."
+end
+
+-- The links and the targeting hint after the line.
+function A.NearExtras(e)
+	local out = {}
+	if #(e.spots or {}) > 0 then out[#out + 1] = A.Link("wp", e.id, "Waypoint") end
+	out[#out + 1] = A.Link("beast", e.id, "Beast page")
+	local key = A.TargetKey()
+	if key then
+		out[#out + 1] = MUTED .. "Press " .. key .. " to target it.|r"
+	elseif ns.db and not ns.db.toldTargetKey then
+		ns.db.toldTargetKey = true
+		out[#out + 1] = MUTED .. "A key can target it: Key Bindings > AddOns > Everlook Pets.|r"
+	end
+	return table.concat(out, " ")
 end
 
 function A:SeeUnit(unit)
@@ -89,10 +160,13 @@ function A:SeeUnit(unit)
 	local line = self.NearLine(npc, ns.Str((ns.Call(UnitClassification, unit))), ns.state.playerLevel, ns.IsWished(npc))
 	if not line then return end
 	self.nearSaid[npc] = now
-	ns:Print(GOLD .. line .. "|r")
+	local e = ns.Bestiary.Get(ns.Data, npc)
+	A.SetTarget(e and (ns.Str((ns.Call(UnitName, unit))) or e.name))
+	ns:Print(GOLD .. line .. "|r " .. (e and A.NearExtras(e) or ""))
 	if ns.db.alertSound then
+		local id = ns.db.alertLoud and A.SOUND_LOUD or A.SOUND_SOFT
 		local play = ns.api("C_Sound", "PlaySound")
-		if not ns.Call(play, 8959, "SFX") then ns.Call(_G.PlaySound, 8959, "Master") end -- the raid warning sound
+		if not ns.Call(play, id, "SFX") then ns.Call(_G.PlaySound, id, "SFX") end
 	end
 end
 

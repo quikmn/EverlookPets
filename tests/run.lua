@@ -686,8 +686,24 @@ step("near alert: rare and wishlisted beasts, once in 5 minutes, with a sound", 
 	local out = logSince(mark)
 	eq(#out, 1, table.concat(out, " / "))
 	check(out[1]:find("Creepthess (rare Spider, level", 1, true) and out[1]:find("on your wishlist", 1, true), out[1])
-	check(out[1]:find("/tar Creepthess", 1, true), out[1])
+	check(not out[1]:find("/tar ", 1, true), "no /tar to retype: " .. out[1])
+	check(out[1]:find("|Haddon:EverlookPets:beast:14279|h[Beast page]|h", 1, true), "a beast page link: " .. out[1])
+	check(out[1]:find("Key Bindings > AddOns > Everlook Pets", 1, true), "says once how to target it with a key")
 	eq(MOCK.sounds, 1, "a sound")
+	eq(MOCK.lastSound, ns.Alerts.SOUND_SOFT, "a soft one by default")
+	-- the key binding's secure button targets that beast
+	eq(EverlookPetsTargetButton:GetAttribute("type"), "macro")
+	eq(EverlookPetsTargetButton:GetAttribute("macrotext"), "/targetexact Creepthess")
+	-- the links work: the beast page, a waypoint (no chat line when it is set)
+	check(ns.Alerts.OnLink("addon:EverlookPets:beast:505"), "link handled")
+	eq(ns.app.current, "beast"); eq(ns.Browser.current.id, 505)
+	ns.app:Close()
+	MOCK.waypoint = nil
+	local before = #MOCK.log
+	check(ns.Alerts.OnLink("addon:EverlookPets:wp:505"), "waypoint link handled")
+	check(MOCK.waypoint and MOCK.waypoint.uiMapID == 1433, "waypoint set from the link")
+	eq(#MOCK.log, before, "no chat line for the waypoint")
+	check(not ns.Alerts.OnLink("addon:OtherAddon:wp:505"), "another addon's link is not ours")
 	MOCK.Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
 	eq(#logSince(mark), 1, "once in 5 minutes")
 	-- a normal beast on your wishlist: your target
@@ -718,13 +734,23 @@ step("near alert: rare and wishlisted beasts, once in 5 minutes, with a sound", 
 	eq(#logSince(mark), 3, "alive again")
 	eq(MOCK.sounds, 2, "no sound when off")
 	ns.db.alertSound = true
+	-- the loud one, when picked; an alert in combat changes the target key's beast after combat
+	ns.db.alertLoud = true
+	MOCK.time = MOCK.time + 400
+	MOCK.combat = true
+	MOCK.Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+	eq(MOCK.lastSound, ns.Alerts.SOUND_LOUD, "raid warning when picked")
+	MOCK.combat = false
+	MOCK.Fire("PLAYER_REGEN_ENABLED")
+	eq(EverlookPetsTargetButton:GetAttribute("macrotext"), "/targetexact Creepthess", "set after combat")
+	ns.db.alertLoud = false
 	-- hidden values (combat, instances): skipped, no error
 	MOCK.time = MOCK.time + 400
 	MOCK.units.nameplate2 = { guid = MOCK.Secret("Creature-0-1-0-1-14279-0000AAAA"), class = "rare" }
 	MOCK.Fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
 	MOCK.units.nameplate3 = { guid = "Creature-0-1-0-1-14279-0000AAAA", class = "rare", dead = MOCK.Secret(false) }
 	MOCK.Fire("NAME_PLATE_UNIT_ADDED", "nameplate3")
-	eq(#logSince(mark), 3, "secret guid or dead state: skipped")
+	eq(#logSince(mark), 4, "secret guid or dead state: skipped")
 	for _, l in ipairs(MOCK.log) do check(not l:find("ERRORHANDLER", 1, true), l) end
 	-- the line itself, too high for you
 	local line = ns.Alerts.NearLine(14279, "rare", 1, false)

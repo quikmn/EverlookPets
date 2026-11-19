@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rare and wishlist alerts: the chat line has clickable [Waypoint] (to its nearest known spawn spot) and [Beast page] links instead of a "/tar Name" to retype. To target the beast, bind a key under Key Bindings > AddOns > Everlook Pets ("Target the beast from the last rare / wishlist alert"); the line then says which key. The sound is a soft ping now; the raid warning sound is a setting ("Use the raid warning sound instead").
 - Setting a waypoint no longer prints a chat line each time; the beast page says where it went, right under its buttons.
 - The minimap button is off by default when Everlook Bar is loaded, since its Everlook Pets plugin on the bar shows the same count. Turn it back on in Settings (or `/epets minimap on`); if you had switched it off, it stays off.
 - The minimap button no longer jumps around when a button drawer (Everlook Bar's, for one) has collected it.

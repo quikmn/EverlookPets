@@ -78,6 +78,8 @@ function impl:GetTop() return (self.__bottom or 400) + self.__h end
 function impl:GetRight() return (self.__left or 100) + self.__w end
 function impl:GetCenter() return (self.__left or 100) + self.__w / 2, (self.__bottom or 400) + self.__h / 2 end
 function impl:SetScript(k, fn) self.__scripts[k] = fn end
+function impl:SetAttribute(k, v) self.__attrs = self.__attrs or {}; self.__attrs[k] = v end
+function impl:GetAttribute(k) return self.__attrs and self.__attrs[k] end
 function impl:GetScript(k) return self.__scripts[k] end
 function impl:HookScript(k, fn)
 	local old = self.__scripts[k]
@@ -396,7 +398,11 @@ MOCK.hunterKnows = {}
 MOCK.pet = nil
 UnitClass = function(u) if u == "player" then return "Hunter", MOCK.class, 3 end end
 UnitExists = function(u) if u == "pet" then return MOCK.pet ~= nil end return true end
-UnitName = function(u) if u == "pet" then return MOCK.pet and MOCK.pet.name end return "Tester" end
+UnitName = function(u)
+	if u == "pet" then return MOCK.pet and MOCK.pet.name end
+	if MOCK.units and MOCK.units[u] then return MOCK.units[u].name end
+	return "Tester"
+end
 UnitCreatureFamily = function(u) if u == "pet" and MOCK.pet then return MOCK.pet.family, MOCK.pet.familyId end end
 UnitLevel = function(u) if u == "pet" then return MOCK.pet and MOCK.pet.level end return MOCK.playerLevel end
 Enum.SpellBookSpellBank = { Player = 0, Pet = 1 }

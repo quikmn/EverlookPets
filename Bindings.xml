@@ -1,0 +1,5 @@
+<Bindings>
+	<!-- Targets the beast from the last rare / wishlist alert (Alerts.lua: a secure macro button, /targetexact <name>). -->
+	<Binding name="CLICK EverlookPetsTargetButton:LeftButton" header="EVERLOOKPETS" category="ADDONS">
+	</Binding>
+</Bindings>

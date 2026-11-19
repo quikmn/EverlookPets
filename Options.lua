@@ -56,8 +56,13 @@ app:Setting({ key = "wish", type = "bool", label = "Tell me when a beast on my w
 	keywords = { "wishlist", "star", "favorite", "alert" },
 	get = function() return ns.db.wishAlert end, set = function(v) ns.db.wishAlert = v end })
 app:Setting({ key = "sound", type = "bool", label = "Play a sound with those lines",
-	keywords = { "sound", "audio", "warning" },
+	desc = "A soft ping. Target the beast with a key: Key Bindings > AddOns > Everlook Pets.",
+	keywords = { "sound", "audio", "warning", "target", "key", "binding" },
 	get = function() return ns.db.alertSound end, set = function(v) ns.db.alertSound = v end })
+app:Setting({ key = "loud", type = "bool", label = "Use the raid warning sound instead (louder)",
+	keywords = { "sound", "loud", "raid warning", "audio" },
+	disabled = function() return not ns.db.alertSound end,
+	get = function() return ns.db.alertLoud end, set = function(v) ns.db.alertLoud = v end })
 app:Setting({ key = "models", type = "bool", label = "3D model on the beast page",
 	desc = "Off saves a little memory and time when you open a beast's page.",
 	keywords = { "model", "3d", "performance", "picture" },
