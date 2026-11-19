@@ -365,7 +365,11 @@ function ns:Update()
 	ns.state = st
 	if ns.Alerts then ns.Alerts:Check(st) end
 	if ns.app and ns.app:IsShown() then ns.app:Refresh() end
-	if ns.MapPins then ns.MapPins:Refresh() end
+	-- the world map's pins wait for the end of a fight (nobody plans a tame mid-combat)
+	if ns.MapPins then
+		if ns.Call(InCombatLockdown) then ns.pinsDirty = true else ns.pinsDirty = false; ns.MapPins:Refresh() end
+	end
+	ns.updates = (ns.updates or 0) + 1 -- tests
 end
 
 -- Many events come in bursts (a level up fires five): update once, a moment later.
@@ -374,6 +378,23 @@ function ns:Queue()
 	if queued then return end
 	queued = true
 	C_Timer.After(0.5, function() queued = false; ns:Update() end)
+end
+
+-- Events that fire all through a fight (happiness, the pet bar, spells) and change nothing to do mid-fight: in
+-- combat they only mark the state stale, and it is read once when combat ends.
+local combatDirty = false
+function ns:QueueLater()
+	if ns.Call(InCombatLockdown) then combatDirty = true return end
+	ns:Queue()
+end
+function ns.OnCombatEnd()
+	if combatDirty then
+		combatDirty = false
+		ns:Queue()
+	elseif ns.pinsDirty and ns.MapPins then
+		ns.pinsDirty = false
+		ns.MapPins:Refresh()
+	end
 end
 
 ------------------------------------------------------------------------
@@ -403,12 +424,15 @@ ns.On("PLAYER_LOGIN", function()
 	if not ns.IsHunter() then return end
 	ns.state.hunter = true
 	local function queue() ns:Queue() end
+	local function later() ns:QueueLater() end
 	local function petOrPlayer(_, unit) if unit == "pet" or unit == "player" then ns:Queue() end end
 	ns.On("UNIT_PET", petOrPlayer)
 	ns.On("UNIT_LEVEL", petOrPlayer)
-	ns.On("UNIT_HAPPINESS", petOrPlayer)
+	ns.On("UNIT_HAPPINESS", function(_, unit) if unit == "pet" or unit == "player" then ns:QueueLater() end end)
 	ns.On("UNIT_PET_TRAINING_POINTS", petOrPlayer)
-	for _, e in ipairs({ "PLAYER_LEVEL_UP", "SPELLS_CHANGED", "PET_BAR_UPDATE", "LEARNED_SPELL_IN_SKILL_LINE" }) do ns.On(e, queue) end
+	for _, e in ipairs({ "PLAYER_LEVEL_UP", "LEARNED_SPELL_IN_SKILL_LINE" }) do ns.On(e, queue) end
+	for _, e in ipairs({ "SPELLS_CHANGED", "PET_BAR_UPDATE" }) do ns.On(e, later) end
+	ns.On("PLAYER_REGEN_ENABLED", function() ns.OnCombatEnd() end)
 	-- Tame Beast (1515) on a target, then a new pet: that beast is tamed by you
 	local pending
 	ns.On("UNIT_SPELLCAST_CHANNEL_START", function(_, unit, _, spell)

@@ -831,6 +831,29 @@ step("no pet, then not a hunter", function()
 	ns:Update()
 end)
 
+step("in combat: happiness, pet bar and spell events wait for the end of the fight; map pins too", function()
+	flush()
+	local refreshes = 0
+	local real = ns.MapPins.Refresh
+	ns.MapPins.Refresh = function(self) refreshes = refreshes + 1; return real(self) end
+	local n = ns.updates or 0
+	MOCK.combat = true
+	for _ = 1, 20 do
+		MOCK.Fire("UNIT_HAPPINESS", "pet"); MOCK.Fire("PET_BAR_UPDATE"); MOCK.Fire("SPELLS_CHANGED")
+	end
+	flush()
+	eq(ns.updates or 0, n, "no updates mid-fight")
+	-- a pet summoned mid-fight still updates, but its map pins wait
+	MOCK.Fire("UNIT_PET", "player"); flush()
+	eq(ns.updates, n + 1, "UNIT_PET updates")
+	eq(refreshes, 0, "no pin refresh in combat")
+	MOCK.combat = false
+	MOCK.Fire("PLAYER_REGEN_ENABLED"); flush()
+	eq(ns.updates, n + 2, "one update after the fight")
+	eq(refreshes, 1, "pins once after the fight")
+	ns.MapPins.Refresh = real
+end)
+
 step("after everything: still no reads of missing globals, no stray writes", function()
 	for k in pairs(missingReads) do error("read missing global " .. k) end
 	for k in pairs(globalWrites) do check(ALLOWED[k], "wrote global " .. k) end
