@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Settings window: switches, buttons and sliders use a softer shade of the accent colour, an on switch has a dark knob so it stands out, and boxes have cleaner rounded edges.
 - The window has a touch of colour: hunter green for the selected page, switches and sliders.
 - Bestiary: WoW Forever's own beasts now show where they spawn and their level when players have seen them (EG Link, our Collector); e.g. Low Plains Buzzard in Riverglades.
 
