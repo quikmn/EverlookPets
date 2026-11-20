@@ -2,7 +2,7 @@
 ## Title: Everlook Pets
 ## Notes: Hunter pets: your pet's abilities and how to get the next rank, a bestiary of tameable beasts with a wishlist, and map pins. /epets
 ## Author: quikmn
-## Version: 0.3.0
+## Version: 0.4.0
 ## SavedVariables: EverlookPetsDB
 ## SavedVariablesPerCharacter: EverlookPetsCharDB
 ## IconTexture: Interface\Icons\Ability_Hunter_BeastTaming
