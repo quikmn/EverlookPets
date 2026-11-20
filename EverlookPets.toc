@@ -5,7 +5,7 @@
 ## Version: 0.4.0
 ## SavedVariables: EverlookPetsDB
 ## SavedVariablesPerCharacter: EverlookPetsCharDB
-## IconTexture: Interface\Icons\Ability_Hunter_BeastTaming
+## IconTexture: Interface\AddOns\EverlookPets\Media\icon
 ## X-License: GPL-3.0
 ## X-Embeds: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, EverlookUI
 
