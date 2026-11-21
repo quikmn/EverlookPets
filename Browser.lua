@@ -559,7 +559,7 @@ local function beastPage(stack)
 		sub = function(r) return teachDetail(r, Br.Ctx()) end,
 		tooltip = function(r) return { r.chip.text, Logic.STATE_LABEL[r.chip.state] or r.chip.state,
 			"Fight with the tamed beast until you learn it, then teach your pet with Beast Training." } end,
-		empty = "Nobody has reported what it teaches yet. Beast Lore it and upload with EverlookDB.",
+		empty = "Nobody has reported what it teaches yet. Tame one or use Beast Lore on it with the EverlookDB addon on, and it shows up in a later version.",
 	})
 
 	UI.Header(stack, "Where it spawns")

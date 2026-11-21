@@ -120,7 +120,7 @@ function ns.Cards(stack, opt)
 		r.sub = UI.Text(r, T.fontSmall + 1, T.muted)
 		r.sub:SetWordWrap(false)
 		r.sub:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -4)
-		r.sub:SetPoint("RIGHT", -10, 0)
+		r.sub:SetPoint("RIGHT", right - 4, 0) -- clear of the star and the buttons, like the title
 		r.chipX = x
 		r:SetScript("OnEnter", function(self)
 			self.bg:SetVertexColor(rgba(T.surfaceHi))
@@ -201,7 +201,8 @@ function ns.Cards(stack, opt)
 		for i = n + 1, #f.rows do f.rows[i].item = nil; f.rows[i]:Hide() end
 		empty:SetText(type(opt.empty) == "function" and opt.empty() or opt.empty or "Nothing here.")
 		empty:SetShown(n == 0)
-		local h = n == 0 and 24 or n * (rowH + 4)
+		-- an empty text may wrap to two lines: give it its room
+		local h = n == 0 and math.max(24, math.ceil((empty:GetStringHeight() or 0) + 8)) or n * (rowH + 4)
 		if #items > n then
 			more:SetText(("Show more (%d left)"):format(#items - n))
 			more:ClearAllPoints()

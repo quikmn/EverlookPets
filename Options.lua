@@ -45,7 +45,7 @@ app:Setting({ key = "minimap", type = "bool", label = "Minimap button (with a co
 	get = function() return ns.ShowMinimapButton() end, set = function(v) ns.db.minimap = v and true or false end,
 	after = function() ns.Alerts:Draw() end })
 app:Setting({ key = "tooltip", type = "bool", label = "Show \"Tameable\" on wild beasts' tooltips",
-	desc = "The beast's family, its level and what its family learns.",
+	desc = "The beast's family and level, what it teaches when tamed and what its family learns.",
 	keywords = { "tame", "beast", "mouseover" },
 	get = function() return ns.db.tooltip end, set = function(v) ns.db.tooltip = v end })
 app:Setting({ key = "rare", type = "bool", label = "Tell me when a rare tameable beast is near",
@@ -340,6 +340,7 @@ app:Section("settings", "Settings", function(stack)
 	app:Widget(stack, "rare")
 	app:Widget(stack, "wish")
 	app:Widget(stack, "sound")
+	app:Widget(stack, "loud")
 	UI.Header(stack, "Window, map and tooltips")
 	app:Widget(stack, "locked")
 	app:Widget(stack, "models")
@@ -398,10 +399,15 @@ app:Command("wishlist", "wishlist", "the beasts you starred, in chat", function(
 		local e = ns.Bestiary.Get(ns.Data, id)
 		if e then list[#list + 1] = e end
 	end
-	table.sort(list, function(a, b) return a.lo < b.lo end)
+	-- by level, a level nobody reported yet last
+	table.sort(list, function(a, b)
+		local la, lb = a.lo > 0 and a.lo or 999, b.lo > 0 and b.lo or 999
+		if la ~= lb then return la < lb end
+		return a.name < b.name
+	end)
 	if #list == 0 then ns:Print("your wishlist is empty: star beasts on the Bestiary page (" .. ns.SLASH .. " beasts).") return end
 	for _, e in ipairs(list) do
-		ns:Print(("%s, level %s, %s"):format(e.name, ns.Bestiary.Levels(e), ns.Bestiary.ZoneName(ns.Data, e.zones[1] or "where not known", ns.MapName)))
+		ns:Print(("%s, level %s, %s"):format(e.name, ns.Bestiary.Levels(e), ns.Bestiary.ZoneName(ns.Data, e.zones[1] or "where it lives isn't known yet", ns.MapName)))
 	end
 end, { "wish" })
 

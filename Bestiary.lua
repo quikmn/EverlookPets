@@ -1,6 +1,6 @@
 -- Everlook Pets: the bestiary's logic. Plain functions over the data tables and a context you pass in (your level,
 -- your pet, your wishlist and tames, names in the game's language), so the tests can feed it fake data.
---   B.Entries(D)                    every tameable beast the browser lists, sorted by level then name
+--   B.Entries(D)                    every tameable beast the browser lists, sorted by level (unknown last) then name
 --   B.Parse(D, query, abilityName)  "bite 6 cat stranglethorn rare" -> what the search asks for
 --   B.Filter(D, entries, f, ctx)    the beasts that match the search and the filter chips
 --   B.Chips(D, entry, ctx)          what the beast teaches, each rank marked against your pet
@@ -52,8 +52,13 @@ function B.Entries(D)
 			by[id] = e
 		end
 	end
+	-- by level; a beast whose level nobody reported yet (lo 0: WoW Forever's new ones) goes last, not first. Among
+	-- the same level, one we know teaches something comes before one nobody reported yet.
 	table.sort(list, function(a, b)
-		if a.lo ~= b.lo then return a.lo < b.lo end
+		local la, lb = a.lo > 0 and a.lo or 999, b.lo > 0 and b.lo or 999
+		if la ~= lb then return la < lb end
+		local ta, tb = #a.teaches > 0, #b.teaches > 0
+		if ta ~= tb then return ta end
 		if a.name ~= b.name then return a.name < b.name end
 		return a.id < b.id
 	end)
