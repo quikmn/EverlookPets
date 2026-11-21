@@ -48,6 +48,11 @@ app:Setting({ key = "tooltip", type = "bool", label = "Show \"Tameable\" on wild
 	desc = "The beast's family and level, what it teaches when tamed and what its family learns.",
 	keywords = { "tame", "beast", "mouseover" },
 	get = function() return ns.db.tooltip end, set = function(v) ns.db.tooltip = v end })
+-- the shared EverlookTooltip switch: an opaque tooltip background
+do
+	local Tip = LibStub("EverlookTooltip-1", true)
+	if Tip and Tip.SolidSetting then Tip:SolidSetting(app, function() return ns.db end) end
+end
 app:Setting({ key = "rare", type = "bool", label = "Tell me when a rare tameable beast is near",
 	desc = "One chat line (once in 5 minutes per beast) when its nameplate, your target or your mouse-over shows it. Turn on enemy nameplates to hear about it from afar.",
 	keywords = { "rare", "alert", "nameplate", "spawn", "camp" },
@@ -351,6 +356,7 @@ app:Section("settings", "Settings", function(stack)
 	app:Widget(stack, "models")
 	app:Widget(stack, "map")
 	app:Widget(stack, "tooltip")
+	if app:GetSetting("tipsolid") then app:Widget(stack, "tipsolid") end
 	UI.Header(stack, "Chat commands")
 	UI.Note(stack, ns.SLASH .. "  this window\n" .. ns.SLASH .. " check  what to do now, in chat\n" .. ns.SLASH
 		.. " chat off, lag 5, minimap off, tooltip off  change a setting\n" .. ns.SLASH .. " get  every setting\n"
@@ -447,5 +453,8 @@ ns.Browser.AddBeast(app)
 -- Runs once the saved settings are loaded (Core.lua, ADDON_LOADED).
 function ns.OnLoaded()
 	app:RegisterSlash(ns.SLASH_ID)
+	-- the shared tooltip switch (solid background) as last chosen in any EverlookDB addon
+	local Tip = LibStub("EverlookTooltip-1", true)
+	if Tip and Tip.LoadSolid then Tip:LoadSolid(ns.db) end
 	ns.Alerts:SetupBroker()
 end

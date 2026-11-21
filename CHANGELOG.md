@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Tooltip: the Tameable lines use the shared EverlookDB tooltip look. New setting "Solid tooltip background" (on by default), shared by every EverlookDB addon.
+
 ## v0.5.1 (2026-11-21)
 - Waypoints in the bestiary now lead to where WoW Forever players actually see a beast; older classic spawn data is only used when we have nothing else, and says so.
 
