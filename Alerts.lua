@@ -27,7 +27,8 @@ end
 
 function A:Check(st)
 	local p, res = st.pet, st.result
-	if not (p and res and res.family and ns.cdb) then self:Draw() return end
+	-- no name yet (just logged in or summoned): the next update has it; nothing is saved under "?"
+	if not (p and p.name and res and res.family and ns.cdb) then self:Draw() return end
 	-- the pet's spellbook isn't filled yet (just summoned, just logged in): wait for the next update
 	if (p.spellCount or 0) == 0 and next(p.knows) == nil then self:Draw() return end
 	local key = p.key

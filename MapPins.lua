@@ -37,13 +37,14 @@ function MP.Hint(mapType, enabled)
 	return nil
 end
 
--- The weakest state among a pin's ranks decides its edge colour.
+-- The surest state among a pin's ranks decides its edge colour (one confirmed rank makes the trip worth it; the
+-- tooltip lists each rank with its own state).
 local EDGE = { confirmed = { 0.384, 0.812, 0.533 }, seen = { 0.902, 0.910, 0.933 }, classic = { 0.553, 0.580, 0.639 } }
-local WEAK = { confirmed = 3, seen = 2, classic = 1 }
+local SURE = { confirmed = 3, seen = 2, classic = 1 }
 function MP.Edge(ranks)
 	local best
 	for _, t in ipairs(ranks or {}) do
-		if not best or (WEAK[t.state] or 0) > (WEAK[best] or 0) then best = t.state end
+		if not best or (SURE[t.state] or 0) > (SURE[best] or 0) then best = t.state end
 	end
 	return EDGE[best or "classic"] or EDGE.classic, best
 end

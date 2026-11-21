@@ -140,6 +140,8 @@ function ns.ReadPet()
 	if not ns.Call(UnitExists, "pet") then return nil end
 	local p = { knows = {} }
 	p.name = ns.Str((ns.Call(UnitName, "pet")))
+	-- right after login or a summon the game may not have the name yet ("Unknown"): not a pet of its own
+	if p.name == (rawget(_G, "UNKNOWNOBJECT") or "Unknown") or p.name == "" then p.name = nil end
 	local famName, famId = ns.Call(UnitCreatureFamily, "pet")
 	p.familyName = ns.Str(famName)
 	p.familyId = familyIdOf(p.familyName, famId)
@@ -222,16 +224,29 @@ function ns.FollowRename(p, key)
 end
 
 -- Your stabled and active pets as the stable shows them (only while it is open, or after it was opened).
+-- A stabled pet's family id from the stable's family name: our English keys, the names the game gave for your own
+-- pets (your language), else the family saved for a pet of that name.
+local function stableFamily(name, famName)
+	local fid = familyIdOf(famName, nil)
+	if fid then return fid end
+	for id, n in pairs(ns.familyNames or {}) do if n == famName then return id end end
+	for _, rec in pairs(ns.cdb.pets) do
+		if type(rec) == "table" and rec.name == name and rec.family then return rec.family end
+	end
+	return nil
+end
+
 function ns.ReadStable()
-	local seen, any = {}, false
+	local seen, any, lists = {}, false, 0
 	for _, fn in ipairs({ "GetActivePetList", "GetStabledPetList" }) do
 		local list = ns.Call(api("C_StableInfo", fn))
 		if type(list) == "table" then
+			lists = lists + 1
 			for _, info in ipairs(list) do
 				local name = type(info) == "table" and ns.Str(info.name)
 				if name then
 					any = true
-					local fid = familyIdOf(ns.Str(info.familyName), nil)
+					local fid = stableFamily(name, ns.Str(info.familyName))
 					local spells = {}
 					for _, id in ipairs(type(info.petAbilities) == "table" and info.petAbilities or {}) do
 						if ns.Num(id) then spells[id] = true end
@@ -243,8 +258,9 @@ function ns.ReadStable()
 			end
 		end
 	end
-	-- a pet you no longer have (abandoned, or renamed elsewhere) stops counting, and what was said about it goes
-	if any then
+	-- a pet you no longer have (abandoned, or renamed elsewhere) stops counting, and what was said about it goes.
+	-- Only when the game gave both lists: half a stable (still loading) must not forget your other pets.
+	if any and lists == 2 then
 		local out = ns.state.pet and ns.state.pet.key
 		if out then seen[out] = true end -- the pet out now always stays
 		for _, t in ipairs(perPet()) do
@@ -327,7 +343,11 @@ function ns.SetWaypoint(map, x, y, title)
 	local P = _G.UiMapPoint
 	local point = type(P) == "table" and ns.Call(P.CreateFromCoordinates, map, x, y)
 	if not point then return nil end
-	if ns.Call(api("C_Map", "SetUserWaypoint"), point) == false then return nil end
+	-- an error (or a missing function) is a miss, not a waypoint
+	local set = api("C_Map", "SetUserWaypoint")
+	if type(set) ~= "function" then return nil end
+	local ok, res = pcall(set, point)
+	if not ok or res == false then return nil end
 	ns.Call(api("C_SuperTrack", "SetSuperTrackedUserWaypoint"), true)
 	return "game"
 end
@@ -381,8 +401,11 @@ function ns:Update()
 		if p then
 			local key = ns.PetKey(p)
 			p.key = key
-			ns.FollowRename(p, key)
-			if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows, p.guid) end
+			-- nothing is saved under a pet whose name the game hasn't given yet (it would stay behind as "?")
+			if p.name then
+				ns.FollowRename(p, key)
+				if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows, p.guid) end
+			end
 			-- a pet you have came from a tame of yours: "tamed by you" in the bestiary
 			if p.npc and ns.cdb and not ns.cdb.tamed[p.npc] then ns.RecordTame(p.npc, 0) end
 			st.result = ns.Logic.Evaluate(ns.Data, {
@@ -465,6 +488,8 @@ ns.On("PLAYER_LOGIN", function()
 	ns.On("UNIT_LEVEL", petOrPlayer)
 	ns.On("UNIT_HAPPINESS", function(_, unit) if unit == "pet" or unit == "player" then ns:QueueLater() end end)
 	ns.On("UNIT_PET_TRAINING_POINTS", petOrPlayer)
+	-- the pet's name arrives (after login or a summon) or changes (renamed)
+	ns.On("UNIT_NAME_UPDATE", function(_, unit) if unit == "pet" then ns:Queue() end end)
 	for _, e in ipairs({ "PLAYER_LEVEL_UP", "LEARNED_SPELL_IN_SKILL_LINE" }) do ns.On(e, queue) end
 	for _, e in ipairs({ "SPELLS_CHANGED", "PET_BAR_UPDATE" }) do ns.On(e, later) end
 	ns.On("PLAYER_REGEN_ENABLED", function() ns.OnCombatEnd() end)

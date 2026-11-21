@@ -8,7 +8,7 @@ if not Tip then return end
 
 -- The npc id inside a creature's GUID ("Creature-0-1-0-1-681-0000ABCDEF" -> 681).
 function ns.NpcId(guid)
-	if type(guid) ~= "string" then return nil end
+	if type(guid) ~= "string" or not ns.Str(guid) then return nil end -- a secret GUID (combat, instances): unknown
 	local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
 	if kind ~= "Creature" then return nil end
 	return tonumber(id)
@@ -27,8 +27,10 @@ function ns.TameLines(npcId, familyName, playerLevel)
 	if not info then return nil end
 	local fam = ns.Data.families[info[1]]
 	if not fam then return nil end
-	local lo, hi = info[2], info[3]
-	local out = { label = "Tameable", value = familyName or fam.key, note = "level " .. lo .. ((hi > lo) and ("-" .. hi) or "") }
+	local lo, hi = info[2] or 0, info[3] or 0
+	-- WoW Forever's new beasts may have no level in our data yet (0): say nothing rather than "level 0"
+	local note = lo > 0 and ("level " .. lo .. ((hi > lo) and ("-" .. hi) or "")) or nil
+	local out = { label = "Tameable", value = familyName or fam.key, note = note }
 	local learns = {}
 	for _, key in ipairs(fam.abilities) do
 		local ab = ns.Data.abilities[key]
