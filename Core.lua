@@ -82,6 +82,8 @@ ns.DEFAULTS = {
 	levelPetTrainer = false, -- ... the pet trainer's ranks (Growl, Great Stamina, resistances)
 	levelHunter = false,     -- ... the hunter trainer's new spells and ranks
 	levelHunterPin = false,  -- ... with the nearest hunter trainer's pin
+	levelFamilies = "current", -- the pet ranks part covers: "current" (your pet's family), "these" (levelFamilyList), "all"
+	levelFamilyList = {},      -- { [family id] = true } for "these"
 }
 -- wishlist: { [npc id] = true } (the bestiary's star); tamed: { [npc id] = times } (your own tames, for "tamed by you")
 ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {} }
@@ -217,6 +219,7 @@ function ns.MovePet(old, new)
 		if t[old] ~= nil and t[new] == nil then t[new] = t[old] end
 		t[old] = nil
 	end
+	if ns.cdb.lastPet == old then ns.cdb.lastPet = new end
 end
 
 -- The pet out now under another key with the same GUID: it was renamed. Move its entries over.
@@ -410,7 +413,10 @@ function ns:Update()
 			-- nothing is saved under a pet whose name the game hasn't given yet (it would stay behind as "?")
 			if p.name then
 				ns.FollowRename(p, key)
-				if p.familyId then remember(key, p.name, p.familyId, p.level, p.knows, p.guid) end
+				if p.familyId then
+					remember(key, p.name, p.familyId, p.level, p.knows, p.guid)
+					if ns.cdb then ns.cdb.lastPet = key end -- the level-up card's pet when none is out
+				end
 			end
 			-- a pet you have came from a tame of yours: "tamed by you" in the bestiary
 			if p.npc and ns.cdb and not ns.cdb.tamed[p.npc] then ns.RecordTame(p.npc, 0) end

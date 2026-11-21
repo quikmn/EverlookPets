@@ -2,6 +2,7 @@
 
 ## Unreleased
 - The level-up card now only shows new ranks for your pet by default; switch on pet trainer, hunter trainer and new spells in the settings if you want them.
+- The new ranks on the level-up card can cover your current pet's family (the default; with no pet out, the last one you had out), families you tick ("These families", your own pets' families listed first), or all families, each rank marked with its family ("Cat: Claw rank 6"). The card keeps to four rows, then "and N more".
 - Tooltip: the Tameable lines use the shared EverlookDB tooltip look. New setting "Solid tooltip background" (on by default), shared by every EverlookDB addon.
 
 ## v0.5.1 (2026-11-21)

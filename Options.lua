@@ -22,6 +22,7 @@ local app = UI:NewApp({
 ns.app = app
 local T = app.T
 
+local function rgbaOf(c) return c[1], c[2], c[3], c[4] or 1 end
 local function hexOf(c) return ("|cff%02x%02x%02x"):format(math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5)) end
 local COLORS = {
 	train = hexOf(T.ok), trainer = "|cffffd200", otherpet = "|cffffd200", tame = "|cffffd200",
@@ -95,6 +96,17 @@ app:Setting({ key = "levelpet", type = "bool", label = "New ranks your pet can l
 	keywords = { "pet ranks", "claw", "bite", "tame", "rank", "level up", "card", "levelup" },
 	disabled = levelOff,
 	get = function() return ns.db.levelPet end, set = function(v) ns.db.levelPet = v end })
+-- Which families the pet ranks part covers; "These families" ticks them in a list (O.FamilyGrid).
+local FAMILY_WORDS = { "family", "families" }
+for _, f in pairs(ns.Data.families) do FAMILY_WORDS[#FAMILY_WORDS + 1] = f.key:lower() end
+table.sort(FAMILY_WORDS)
+app:Setting({ key = "levelfamilies", type = "choice", label = "New ranks for", width = 240,
+	desc = "Your current pet's family (no pet out: the last one you had out), the families you tick, or every family. A rank shows only when that family's pet of yours lacks it.",
+	choices = { { value = "current", text = "My current pet's family" }, { value = "these", text = "These families" }, { value = "all", text = "All families" } },
+	keywords = FAMILY_WORDS,
+	disabled = function() return not (ns.db.levelCard or ns.db.levelChat) or not ns.db.levelPet end,
+	get = function() return ns.db.levelFamilies or "current" end, set = function(v) ns.db.levelFamilies = v end,
+	after = function() app:Refresh() end })
 app:Setting({ key = "levelpettrainer", type = "bool", label = "Pet trainer ranks (Growl, Great Stamina, resistances)",
 	desc = "The ranks a pet trainer sells that opened at your level.",
 	keywords = { "trainer", "pet trainer", "growl", "stamina", "resistance", "level up", "card", "levelup" },
@@ -115,6 +127,109 @@ app:Setting({ key = "locked", type = "bool", label = "List abilities that open a
 	keywords = { "later", "future", "hide" },
 	get = function() return ns.db.showLocked end, set = function(v) ns.db.showLocked = v end,
 	after = function() app:Refresh() end })
+
+------------------------------------------------------------------------
+-- The family tick list ("These families"): your pets' families first, marked with their names; then the rest by
+-- name. Three columns of small tick boxes; shown only while "These families" is picked.
+------------------------------------------------------------------------
+-- The families in list order: { { id, name, pets = "Shadowclaw, Rex" or nil } }.
+function O.FamilyOrder()
+	local mine = {}
+	for _, rec in pairs(ns.cdb and ns.cdb.pets or {}) do
+		if type(rec) == "table" and rec.family and rec.name then
+			mine[rec.family] = mine[rec.family] or {}
+			table.insert(mine[rec.family], rec.name)
+		end
+	end
+	local out = {}
+	for id in pairs(ns.Data.families) do
+		local names = mine[id]
+		if names then table.sort(names) end
+		out[#out + 1] = { id = id, name = ns.FamilyName(id) or ns.Data.families[id].key, pets = names and table.concat(names, ", ") or nil }
+	end
+	table.sort(out, function(a, b)
+		if (a.pets ~= nil) ~= (b.pets ~= nil) then return a.pets ~= nil end
+		return a.name < b.name
+	end)
+	return out
+end
+
+function O.SetFamily(id, on)
+	ns.db.levelFamilyList = type(ns.db.levelFamilyList) == "table" and ns.db.levelFamilyList or {}
+	ns.db.levelFamilyList[id] = on and true or nil
+end
+
+local CHECK = "Interface\Buttons\UI-CheckBox-Check"
+function O.FamilyGrid(stack)
+	local U = UI.Util
+	local f = CreateFrame("Frame")
+	f:SetParent(stack.parent)
+	f.boxes = {}
+	local COLS, ROWH = 3, 24
+	local function box(i)
+		local b = f.boxes[i]
+		if b then return b end
+		b = CreateFrame("Button", nil, f)
+		b:SetHeight(ROWH - 2)
+		b.sq = CreateFrame("Frame", nil, b)
+		b.sq:SetSize(14, 14)
+		b.sq:SetPoint("LEFT", 2, 0)
+		U.Solid(b.sq, "BACKGROUND", T.surfaceHi[1], T.surfaceHi[2], T.surfaceHi[3], 1):SetAllPoints()
+		b.edge = U.Border(b.sq, 1, T.border[1], T.border[2], T.border[3], 1)
+		b.tick = b.sq:CreateTexture(nil, "OVERLAY")
+		b.tick:SetSize(18, 18)
+		b.tick:SetPoint("CENTER", 1, 0)
+		b.tick:SetTexture(CHECK)
+		b.text = UI.Text(b, T.font, T.text)
+		b.text:SetPoint("LEFT", b.sq, "RIGHT", 8, 0)
+		b.text:SetPoint("RIGHT", -4, 0)
+		b.text:SetWordWrap(false)
+		b:SetScript("OnClick", function(self)
+			O.SetFamily(self.fam.id, not (ns.db.levelFamilyList or {})[self.fam.id])
+			f:Refresh()
+		end)
+		b:SetScript("OnEnter", function(self)
+			if not self.fam.pets then return end
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:AddLine(self.fam.name, 1, 1, 1)
+			GameTooltip:AddLine("Your pets: " .. self.fam.pets, nil, nil, nil, true)
+			GameTooltip:Show()
+		end)
+		b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		f.boxes[i] = b
+		return b
+	end
+	function f:Refresh()
+		local on = ns.db.levelFamilies == "these"
+		if not on then
+			for _, b in ipairs(f.boxes) do b:Hide() end
+			f:Hide()
+			stack:SetHeightOf(f, 1)
+			return
+		end
+		f:Show()
+		local list, chosen = O.FamilyOrder(), ns.db.levelFamilyList or {}
+		local w = math.floor(stack.width / COLS)
+		for i, fam in ipairs(list) do
+			local b = box(i)
+			b.fam = fam
+			b:SetWidth(w - 6)
+			b:ClearAllPoints()
+			b:SetPoint("TOPLEFT", ((i - 1) % COLS) * w, -math.floor((i - 1) / COLS) * ROWH)
+			b.text:SetText(fam.name .. (fam.pets and ("  |cff8d94a3" .. fam.pets .. "|r") or ""))
+			b.tick:SetShown(chosen[fam.id] and true or false)
+			b.edge:SetColor(rgbaOf(chosen[fam.id] and T.accent or T.border))
+			b:Show()
+		end
+		for i = #list + 1, #f.boxes do f.boxes[i]:Hide() end
+		stack:SetHeightOf(f, math.ceil(#list / COLS) * ROWH + 4)
+	end
+	f.searchInfo = { label = "Families for new pet ranks", desc = "Tick the families the level-up card covers (with \"These families\").",
+		keywords = FAMILY_WORDS }
+	stack:Add(f, 1, 6)
+	f:Refresh()
+	return f
+end
 
 ------------------------------------------------------------------------
 -- Links (an addon can't open a browser: a window with the address to copy)
@@ -372,6 +487,8 @@ app:Section("settings", "Settings", function(stack)
 	app:Widget(stack, "levelcard")
 	app:Widget(stack, "levelchat")
 	app:Widget(stack, "levelpet")
+	app:Widget(stack, "levelfamilies")
+	O.FamilyGrid(stack)
 	app:Widget(stack, "levelpettrainer")
 	app:Widget(stack, "levelhunter")
 	app:Widget(stack, "levelhunterpin")

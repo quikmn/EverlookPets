@@ -1312,6 +1312,122 @@ step("level up card parts: the defaults, each part on and off, the chat line fol
 	ns:Update(); flush()
 end)
 
+step("level up families: which pets and families the ranks are for (LU.Targets)", function()
+	local D = ns.Data
+	local pets = {
+		["Shadowclaw|2"] = { name = "Shadowclaw", family = 2, level = 40, spells = set(16831) },
+		["Rex|1"] = { name = "Rex", family = 1, level = 30, spells = {} },
+	}
+	local cur = { key = "Shadowclaw|2", familyId = 2, name = "Shadowclaw", level = 40, knows = knows(set(16831)) }
+	local t = LU.Targets(D, "current", nil, pets, cur, "Rex|1")
+	check(#t == 1 and t[1].familyId == 2 and t[1].current, "current: the pet out")
+	t = LU.Targets(D, "current", nil, pets, nil, "Rex|1")
+	check(#t == 1 and t[1].familyId == 1 and t[1].name == "Rex", "no pet out: the last one out")
+	eq(#LU.Targets(D, "current", nil, pets, nil, nil), 0, "no pet known: nothing")
+	eq(#LU.Targets(D, "current", nil, {}, nil, "Gone|3"), 0, "a last pet you no longer have: nothing")
+	-- these: the pet out first, then families you have a pet of, then by name
+	local spiderId
+	for id, f in pairs(D.families) do if f.key == "Spider" then spiderId = id end end
+	t = LU.Targets(D, "these", { [1] = true, [2] = true, [spiderId] = true }, pets, cur)
+	eq(#t, 3, "three ticked")
+	check(t[1].familyId == 2 and t[2].familyId == 1 and t[2].name == "Rex" and t[3].familyId == spiderId and t[3].key == nil, "order")
+	eq(#LU.Targets(D, "these", {}, pets, cur), 0, "nothing ticked: nothing")
+	local n = 0
+	for _ in pairs(D.families) do n = n + 1 end
+	eq(#LU.Targets(D, "all", nil, pets, nil), n, "all families")
+	-- the ranks, by family: Cat's Claw for Shadowclaw only when it lacks it; a family without a pet counts every rank
+	local function news(mode, chosen, curPet)
+		return LU.Compute(D, { level = 40, where = { level = 40, continent = 1415 }, multi = mode ~= "current", pets = pets,
+			targets = LU.Targets(D, mode, chosen, pets, curPet, "Rex|1"), petName = curPet and curPet.name })
+	end
+	local c = news("these", { [2] = true, [spiderId] = true }, cur)
+	local claw = findItem(c.pet, "Claw")
+	check(claw and claw.famName == "Cat" and claw.petName == "Shadowclaw", "Claw for the cat")
+	check(strip(LU.PetTitle(claw, c)):find("^Cat: Claw rank 6"), strip(LU.PetTitle(claw, c)))
+	local web
+	for _, it in ipairs(c.pet) do if it.famName == "Spider" then web = it end end
+	check(web and web.petName == nil, "a spider rank, no pet of yours")
+	check(strip(LU.PetSub(web, c)):find("Spider", 1, true) or web.kind == "tame" or web.kind == "tameunknown", strip(LU.PetSub(web, c)))
+	local catKnows = { key = "Shadowclaw|2", familyId = 2, name = "Shadowclaw", level = 40, knows = knows(set(16831, 16832)) }
+	c = news("these", { [2] = true }, catKnows)
+	check(not findItem(c.pet, "Claw"), "Shadowclaw has Claw 6: not listed")
+	c = news("current", nil, cur)
+	claw = findItem(c.pet, "Claw")
+	check(claw and claw.famName == nil, "current: no family prefix")
+	check(strip(LU.PetTitle(claw, c)):find("^New: Claw rank 6"), strip(LU.PetTitle(claw, c)))
+	c = news("current", nil, nil)
+	for _, it in ipairs(c.pet) do eq(it.famId, 1, "no pet out: the last one's family (wolf)") end
+end)
+
+step("level up families in the game: no pet out, these families, all families and the cap", function()
+	local saved = { pet = MOCK.pet, level = MOCK.playerLevel, knows = MOCK.hunterKnows }
+	local savedPets, savedLast = ns.cdb.pets, ns.cdb.lastPet
+	MOCK.pet = { name = "Shadowclaw", family = "Cat", familyId = 2, level = 40, knows = set(16831, 17259, 23109, 24452, 14918, 4191) }
+	MOCK.playerLevel = 40
+	MOCK.hunterKnows = {}
+	ns:Update(); flush()
+	eq(ns.cdb.lastPet, "Shadowclaw|2", "the last pet out is remembered")
+	eq(ns.DEFAULTS.levelFamilies, "current", "current pet's family by default")
+	-- no pet out: the last one's ranks
+	MOCK.pet = nil
+	ns:Update(); flush()
+	LU.Hide()
+	slash("levelup")
+	local f = LU.frame
+	check(f:IsShown() and findItem(f.content.pet, "Claw"), "no pet out: Shadowclaw's Claw")
+	check(f.sub:GetText():find("Shadowclaw", 1, true), f.sub:GetText())
+	-- no pet known at all: nothing for a pet
+	ns.cdb.pets, ns.cdb.lastPet = {}, nil
+	f:Hide()
+	eq(#LU.Pick(LU.Build(), LU.Sections()).pet, 0, "no known pet: no pet ranks")
+	eq(LU.Show(nil, true), "none", "and so no card (the other parts are off)")
+	check(not f:IsShown(), "no card")
+	ns.cdb.pets, ns.cdb.lastPet = savedPets, "Shadowclaw|2"
+	-- these families: Cat and Wolf, with the pet out
+	MOCK.pet = { name = "Shadowclaw", family = "Cat", familyId = 2, level = 40, knows = set(16831, 17259, 23109, 24452, 14918, 4191) }
+	ns:Update(); flush()
+	slash("levelfamilies these")
+	eq(ns.db.levelFamilies, "these")
+	ns.db.levelFamilyList = { [1] = true, [2] = true }
+	slash("levelup")
+	local c = f.content
+	check(c.multi and findItem(c.pet, "Claw").famName == "Cat" and findItem(c.pet, "Furious Howl").famName == "Wolf", kinds(c.pet))
+	local heads = {}
+	for _, h in ipairs(f.heads) do if h:IsShown() then heads[#heads + 1] = strip(h.text:GetText()) end end
+	eq(heads[1], "New ranks for your pets")
+	local titled = false
+	for _, r in ipairs(f.rows) do if r:IsShown() and strip(r.title:GetText()):find("^Cat: Claw rank 6") then titled = true end end
+	check(titled, "a row says Cat: Claw rank 6")
+	-- the family list on the Settings page: your pets' families first, marked
+	local order = ns.Options.FamilyOrder()
+	check(order[1].pets and order[1].pets:find("Shadowclaw", 1, true), "Shadowclaw's family first")
+	-- all families: the card keeps to 4 rows, then "and N more"
+	slash("levelfamilies all")
+	slash("levelup")
+	c = f.content
+	check(#c.pet > LU.MAX_PET, "more ranks than room: " .. #c.pet)
+	local rows = 0
+	for _, r in ipairs(f.rows) do if r:IsShown() then rows = rows + 1 end end
+	eq(rows, LU.MAX_PET, "4 rows")
+	local more
+	for _, h in ipairs(f.heads) do if h:IsShown() and strip(h.text:GetText()):find("^and %d+ more") then more = strip(h.text:GetText()) end end
+	check(more and more:find(("and %d more"):format(#c.pet - LU.MAX_PET), 1, true) and more:find("/epets recent", 1, true), tostring(more))
+	-- the settings search finds the family choice
+	f:Hide()
+	-- the settings search: family, cat, bear, trainer, hunter skills, pet ranks, claw
+	if not ns.app:IsShown() then slash("") end
+	for _, w in ipairs({ "family", "cat", "bear", "trainer", "hunter skills", "pet ranks", "claw" }) do
+		check(#ns.app:Search(w) > 0, "the search finds " .. w)
+	end
+	ns.app:Search("")
+	ns.app:Close()
+	slash("levelfamilies current")
+	ns.db.levelFamilyList = {}
+	MOCK.pet, MOCK.playerLevel, MOCK.hunterKnows = saved.pet, saved.level, saved.knows
+	ns.cdb.pets["Shadowclaw|2"], ns.cdb.alerted["Shadowclaw|2"], ns.cdb.unseen["Shadowclaw|2"], ns.cdb.lagNoted["Shadowclaw|2"] = nil, nil, nil, nil
+	ns:Update(); flush()
+end)
+
 step("level up card: waits for the end of a fight; nothing new shows nothing; not for other classes", function()
 	local saved = MOCK.playerLevel
 	LU.Hide()

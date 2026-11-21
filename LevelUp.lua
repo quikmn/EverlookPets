@@ -172,14 +172,97 @@ end
 -- (LU.HunterSpells), pet, trainer (LU.PetNews), hunterTrainer, petTrainer (LU.Trainer), lag (text or nil),
 -- petName, empty (nothing new) }.
 function LU.Compute(D, s)
-	local out = { level = s.level, prev = s.prev or (s.level - 1), petName = s.petName }
+	local out = { level = s.level, prev = s.prev or (s.level - 1), petName = s.petName, multi = s.multi }
 	out.hunter = LU.HunterSpells(D, s.level, out.prev, s.hunterKnows)
-	out.pet, out.trainer = LU.PetNews(D, s)
+	if s.targets then
+		out.pet, out.trainer = LU.TargetNews(D, s)
+	else
+		out.pet, out.trainer = LU.PetNews(D, s)
+	end
 	if #out.hunter > 0 then out.hunterTrainer = LU.Trainer(D, "hunter", s.level, s.where, s.faction, s.pos) end
 	if #out.trainer > 0 then out.petTrainer = LU.Trainer(D, "pet", s.level, s.where, s.faction, s.pos) end
 	out.lag = s.lag
 	out.empty = #out.hunter == 0 and #out.pet == 0 and #out.trainer == 0
 	return out
+end
+
+------------------------------------------------------------------------
+-- Which families "For your pet" covers (Settings: My current pet's family, These families, All families)
+------------------------------------------------------------------------
+LU.FAMILY_MODES = { "current", "these", "all" }
+
+-- The pets the part is about. mode: "current" | "these" | "all"; chosen: { [family id] = true } ("these");
+-- pets: your saved pets { [key] = { name, family, level, spells } }; cur: the pet out now { key, familyId, name,
+-- level, knows(spell) } or nil; lastKey: the key of the last pet you had out.
+-- Returns { { familyId, key, name, level, knows(spell), current } }: "current" gives the pet out (else the last one
+-- out, else nothing); the others one per family, the pet out first, then families you have a pet of, then by name.
+-- A family with no pet of yours has no key: every rank that opens counts as one it lacks.
+function LU.Targets(D, mode, chosen, pets, cur, lastKey)
+	pets = pets or {}
+	local function fromRec(key, rec)
+		local spells = type(rec.spells) == "table" and rec.spells or {}
+		return { familyId = rec.family, key = key, name = rec.name, level = rec.level, knows = function(spell) return spells[spell] == true end }
+	end
+	if mode ~= "these" and mode ~= "all" then
+		if cur and cur.familyId and D.families[cur.familyId] then
+			return { { familyId = cur.familyId, key = cur.key, name = cur.name, level = cur.level, knows = cur.knows, current = true } }
+		end
+		local rec = lastKey and pets[lastKey]
+		if type(rec) == "table" and rec.family and D.families[rec.family] then return { fromRec(lastKey, rec) } end
+		return {}
+	end
+	-- your best pet of each family (the one out, else the highest level)
+	local best = {}
+	for key, rec in pairs(pets) do
+		if type(rec) == "table" and rec.family then
+			local b = best[rec.family]
+			if not b or (rec.level or 0) > (b.level or 0) or ((rec.level or 0) == (b.level or 0) and key < b.key) then
+				best[rec.family] = fromRec(key, rec)
+			end
+		end
+	end
+	if cur and cur.familyId then
+		best[cur.familyId] = { familyId = cur.familyId, key = cur.key, name = cur.name, level = cur.level, knows = cur.knows, current = true }
+	end
+	local out = {}
+	for fid in pairs(D.families) do
+		if mode == "all" or (chosen and chosen[fid]) then
+			out[#out + 1] = best[fid] or { familyId = fid }
+		end
+	end
+	table.sort(out, function(a, b)
+		if (a.current or false) ~= (b.current or false) then return a.current == true end
+		if (a.key ~= nil) ~= (b.key ~= nil) then return a.key ~= nil end
+		return D.families[a.familyId].key < D.families[b.familyId].key
+	end)
+	return out
+end
+
+-- LU.PetNews for each of s.targets (LU.Targets), in their order. Each item knows its family (famId, famName with
+-- s.multi) and its pet (petName). The pet trainer's ranks: the first target's, when it is a pet of yours.
+function LU.TargetNews(D, s)
+	local pet, trainer = {}, {}
+	for i, t in ipairs(s.targets) do
+		local ss = {}
+		for k, v in pairs(s) do ss[k] = v end
+		ss.familyId, ss.petName, ss.petLevel, ss.petKnows = t.familyId, t.name, t.level, t.knows
+		if not t.current then ss.free = nil end
+		ss.otherPet = function(spell)
+			for key, rec in pairs(s.pets or {}) do
+				if key ~= t.key and type(rec) == "table" and type(rec.spells) == "table" and rec.spells[spell] then return rec.name end
+			end
+			return nil
+		end
+		local p, tr = LU.PetNews(D, ss)
+		local famName = s.familyName and s.familyName(t.familyId) or D.families[t.familyId].key
+		for _, it in ipairs(p) do
+			it.famId, it.petName = t.familyId, t.name
+			if s.multi then it.famName = famName end
+			pet[#pet + 1] = it
+		end
+		if i == 1 and t.key then trainer = tr end
+	end
+	return pet, trainer
 end
 
 -- Only the parts of the card you ticked (Settings, under the level-up card): opt = { pet, petTrainer, hunter,
@@ -211,7 +294,10 @@ end
 ------------------------------------------------------------------------
 -- What the rows say
 ------------------------------------------------------------------------
-local function petWord(c) return c.petName or "your pet" end
+local function petWord(c, it)
+	if it and it.famName then return it.petName or ("a " .. it.famName) end
+	return (it and it.petName) or c.petName or "your pet"
+end
 
 local function levels(t)
 	if not t or (t.lo or 0) <= 0 then return "level ?" end
@@ -220,17 +306,20 @@ end
 
 -- The title of a "for your pet" row.
 function LU.PetTitle(it, c)
-	return ("%sNew:|r %s rank %d %sfor %s|r"):format(GOLD, it.name, it.rank.rank, MUTED, petWord(c))
+	if it.famName then
+		return ("%s%s:|r %s rank %d%s"):format(GOLD, it.famName, it.name, it.rank.rank, it.petName and (MUTED .. " for " .. it.petName .. "|r") or "")
+	end
+	return ("%sNew:|r %s rank %d %sfor %s|r"):format(GOLD, it.name, it.rank.rank, MUTED, petWord(c, it))
 end
 
 -- The line under it: what to do.
 function LU.PetSub(it, c)
 	local s
 	if it.kind == "teach" then
-		s = ("You know it: teach it to %s with Beast Training"):format(petWord(c))
+		s = ("You know it: teach it to %s with Beast Training"):format(petWord(c, it))
 		if it.net then s = s .. (" (%d TP%s)"):format(it.net, it.fits == false and (", " .. RED .. "more than it has free|r") or "") end
 	elseif it.kind == "otherpet" then
-		s = ("%s knows it: fight with that pet to learn it, then teach %s"):format(it.otherName, petWord(c))
+		s = ("%s knows it: fight with that pet to learn it, then teach %s"):format(it.otherName, petWord(c, it))
 	elseif it.kind == "tame" then
 		local t = it.beasts[1]
 		local zone = t.zone and t.zone ~= 0 and B.ZoneName(ns.Data, t.zone, ns.MapName) or nil
@@ -238,7 +327,7 @@ function LU.PetSub(it, c)
 	else
 		s = "Tame a beast that knows it" .. MUTED .. ((it.beasts and it.beasts[1]) and (" (from level " .. it.beasts[1].lo .. ")") or " (no beast reported yet)") .. "|r"
 	end
-	if it.petLow then s = s .. MUTED .. (" · once %s is level %d|r"):format(petWord(c), it.rank.level) end
+	if it.petLow then s = s .. MUTED .. (" · once %s is level %d|r"):format(petWord(c, it), it.rank.level) end
 	return s
 end
 
@@ -263,20 +352,38 @@ function LU.TrainerLine(t)
 	return ("%s, %s %.1f, %.1f"):format(t.name, B.ZoneName(ns.Data, t.map, ns.MapName) or t.zone, t.x * 100, t.y * 100)
 end
 
--- The one chat line (the "chat instead" setting).
-function LU.ChatLine(c)
+-- "Level 40! Claw 6, Bite 7 for Shadowclaw; 2 at a pet trainer" (the chat line without its hint; the Recent page).
+function LU.Summary(c)
 	local parts = {}
 	if #c.pet > 0 then
 		local names = {}
 		for i, it in ipairs(c.pet) do
 			if i > 3 then names[#names] = names[#names] .. (" and %d more"):format(#c.pet - 3) break end
-			names[#names + 1] = ("%s %d"):format(it.name, it.rank.rank)
+			names[#names + 1] = (it.famName and (it.famName .. ": ") or "") .. ("%s %d"):format(it.name, it.rank.rank)
 		end
-		parts[#parts + 1] = table.concat(names, ", ") .. " for " .. petWord(c)
+		parts[#parts + 1] = table.concat(names, ", ") .. (c.multi and "" or (" for " .. petWord(c)))
 	end
 	if #c.hunter > 0 then parts[#parts + 1] = ("%d new at the hunter trainer"):format(#c.hunter) end
 	if #c.trainer > 0 then parts[#parts + 1] = ("%d at a pet trainer"):format(#c.trainer) end
-	return ("Level %d! %s. %s levelup shows them."):format(c.level, table.concat(parts, "; "), ns.SLASH)
+	return ("Level %d! %s"):format(c.level, table.concat(parts, "; "))
+end
+
+-- The one chat line (the "chat instead" setting).
+function LU.ChatLine(c)
+	return ("%s. %s levelup shows them."):format(LU.Summary(c), ns.SLASH)
+end
+
+-- Every rank on the card, one plain line each (the Recent page's tooltip keeps the ones the card had no room for).
+function LU.Lines(c)
+	local out = {}
+	for _, it in ipairs(c.pet or {}) do
+		local who = it.petName or (not c.multi and c.petName) or nil
+		out[#out + 1] = (it.famName and (it.famName .. ": ") or "") .. ("%s rank %d"):format(it.name, it.rank.rank)
+			.. (who and (" for " .. who) or "")
+	end
+	for _, it in ipairs(c.trainer or {}) do out[#out + 1] = ("%s rank %d (pet trainer)"):format(it.name, it.rank.rank) end
+	for _, h in ipairs(c.hunter or {}) do out[#out + 1] = (h.name or "?") .. ((h.rank or 0) > 0 and (" rank " .. h.rank) or "") .. " (hunter trainer)" end
+	return out
 end
 
 ------------------------------------------------------------------------
@@ -309,14 +416,20 @@ function LU.Build(level, prev)
 	local p = st.pet
 	local here = ns.Here()
 	local s = { level = level, prev = prev or (level - 1), hunterKnows = ns.HunterKnows, where = here,
-		faction = LU.Faction(), pos = LU.Pos, nameOf = ns.AbilityName }
+		faction = LU.Faction(), pos = LU.Pos, nameOf = ns.AbilityName, familyName = ns.FamilyName }
+	local cur
 	if p and p.familyId and st.result and st.result.family then
-		s.familyId, s.petName, s.petLevel = p.familyId, p.name, p.level
-		s.petKnows = function(spell) return ns.PetKnows(p, spell) end
-		s.otherPet = function(spell) return ns.OtherPetKnows(p.key, spell) end
+		cur = { key = p.key, familyId = p.familyId, name = p.name, level = p.level, knows = function(spell) return ns.PetKnows(p, spell) end }
+		s.petName = p.name
 		if p.tpTotal then s.free = p.tpTotal - (p.tpUsed or 0) end
 		s.lag = L.LagText(st.result.lag, ns.db and ns.db.lagWarn)
 	end
+	local mode = ns.db and ns.db.levelFamilies or "current"
+	s.multi = mode == "these" or mode == "all"
+	s.pets = ns.cdb and ns.cdb.pets or {}
+	s.targets = LU.Targets(ns.Data, mode, ns.db and ns.db.levelFamilyList, s.pets, cur, ns.cdb and ns.cdb.lastPet)
+	-- no pet out: the last one you had out
+	if not cur and not s.multi and s.targets[1] then s.petName = s.targets[1].name end
 	return LU.Compute(ns.Data, s)
 end
 
@@ -474,7 +587,7 @@ local function info(f, i)
 	return t
 end
 
-LU.MAX_PET, LU.MAX_SPELLS, LU.MAX_TRAINER = 3, 8, 6 -- the card stays clear of the action bars
+LU.MAX_PET, LU.MAX_SPELLS, LU.MAX_TRAINER = 4, 8, 6 -- the card stays clear of the action bars
 
 -- Fills the card from LU.Build's content.
 function LU.Fill(c)
@@ -528,7 +641,7 @@ function LU.Fill(c)
 		y = y + 24
 	end
 	if #c.pet > 0 or c.lag then
-		header("For " .. (c.petName or "your pet"))
+		header(c.multi and "New ranks for your pets" or ("For " .. (c.petName or "your pet")))
 		if c.lag then
 			nr = nr + 1
 			local r = row(f, nr)
@@ -539,8 +652,9 @@ function LU.Fill(c)
 			r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
 			y = y + ROW + 4
 		end
+		local room = LU.MAX_PET - (c.lag and 1 or 0)
 		for i, it in ipairs(c.pet) do
-			if i > LU.MAX_PET then break end
+			if i > room then break end
 			nr = nr + 1
 			local r = row(f, nr)
 			r.icon:SetTexture(ns.AbilityIcon(it.ab, it.rank))
@@ -566,8 +680,8 @@ function LU.Fill(c)
 			r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
 			y = y + ROW + 4
 		end
-		if #c.pet > LU.MAX_PET then
-			header(MUTED .. ("+%d more on the Your pet page|r"):format(#c.pet - LU.MAX_PET))
+		if #c.pet > room then
+			header(MUTED .. ("and %d more · %s recent|r"):format(#c.pet - room, ns.SLASH))
 		end
 		y = y + 6
 	end
