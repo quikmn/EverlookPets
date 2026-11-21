@@ -248,6 +248,23 @@ step("bestiary: entries from the data, sorted by level", function()
 	eq(Bst.ZoneName(BD, "Wailing Caverns"), "Wailing Caverns")
 end)
 
+step("bestiary: a level nobody reported goes last; known teachers first among the same level", function()
+	local D2 = {}
+	for k, v in pairs(BD) do D2[k] = v end
+	D2.tameable, D2.wild = {}, {}
+	for k, v in pairs(BD.tameable) do D2.tameable[k] = v end
+	for k, v in pairs(BD.wild) do D2.wild[k] = v end
+	D2.tameable[7] = { 1, 0, 0 }; D2.wild[7] = { "Galestrider", 0, 0, 1, { { 10, 500, 500 } } } -- no level known
+	D2.tameable[8] = { 2, 9, 10 }; D2.wild[8] = { "Aaa Lynx", 0, 0, 0, { { 10, 200, 200 } } } -- level 9, teaches nothing known
+	local list = Bst.Entries(D2)
+	eq(list[#list].name, "Galestrider", "level ? last")
+	eq(Bst.Levels(list[#list]), "?")
+	local prowler, lynx
+	for i, e in ipairs(list) do if e.name == "Prowler" then prowler = i elseif e.name == "Aaa Lynx" then lynx = i end end
+	check(prowler < lynx, "Prowler (teaches Bite 2) before Aaa Lynx (nothing reported) at level 9")
+	Bst.Entries(BD) -- back to the shared fake data
+end)
+
 step("bestiary: search words (ability rank, ability, family, zone, rare, level, name)", function()
 	local p = Bst.Parse(BD, "Bite 3 cat stranglethorn")
 	eq(#p.abilities, 1); eq(p.abilities[1].key, "Bite"); eq(p.abilities[1].rank, 3)
@@ -887,6 +904,71 @@ step("in combat: happiness, pet bar and spell events wait for the end of the fig
 	eq(ns.updates, n + 2, "one update after the fight")
 	eq(refreshes, 1, "pins once after the fight")
 	ns.MapPins.Refresh = real
+end)
+
+step("settings: every setting is on a page, so the settings search finds it", function()
+	if not ns.app:IsShown() then slash("") end
+	for _, def in ipairs(ns.app.settingOrder) do
+		local found = ns.app:Search(def.label)
+		check(#found > 0, "the search finds \"" .. def.label .. "\"")
+	end
+	check(#ns.app:Search("raid warning") > 0, "the louder sound")
+	ns.app:Search("")
+	ns.app:Close()
+end)
+
+step("a pet whose name the game hasn't given yet: nothing saved, nothing said", function()
+	local saved = MOCK.pet.name
+	MOCK.pet.name = "Unknown"
+	mark = #MOCK.log
+	ns:Update()
+	eq(ns.state.pet.name, nil, "no name yet")
+	for key in pairs(ns.cdb.pets) do check(not key:find("^Unknown|") and not key:find("^%?|"), "saved as " .. key) end
+	for key in pairs(ns.cdb.alerted) do check(not key:find("^Unknown|") and not key:find("^%?|"), "alerted as " .. key) end
+	eq(#logSince(mark), 0, "no chat line: " .. table.concat(logSince(mark), " / "))
+	MOCK.pet.name = saved
+	MOCK.Fire("UNIT_NAME_UPDATE", "pet")
+	flush()
+	eq(ns.state.pet.name, saved, "the name arrives")
+end)
+
+step("the stable: half a list (still loading) forgets none of your pets", function()
+	MOCK.stabled = { { name = "Fang", familyName = "Cat", level = 20, petAbilities = { 17256 } } }
+	MOCK.stableActive = { { name = MOCK.pet.name, familyName = "Cat", level = 16, petAbilities = { 17253 } } }
+	MOCK.Fire("PET_STABLE_SHOW"); flush()
+	check(ns.cdb.pets["Fang|2"], "Fang saved")
+	MOCK.stableActive = nil -- the active list isn't there yet
+	MOCK.stabled = { { name = "Other", familyName = "Cat", level = 5, petAbilities = {} } }
+	MOCK.Fire("PET_STABLE_UPDATE"); flush()
+	check(ns.cdb.pets["Fang|2"], "Fang kept while a list is missing")
+	-- a family name in another language: the family saved for that pet
+	MOCK.stableActive = { { name = MOCK.pet.name, familyName = "Cat", level = 16, petAbilities = { 17253 } } }
+	MOCK.stabled = { { name = "Fang", familyName = "Katze", level = 20, petAbilities = { 17256 } } }
+	MOCK.Fire("PET_STABLE_UPDATE"); flush()
+	check(ns.cdb.pets["Fang|2"] and not ns.cdb.pets["Fang|0"], "Fang stays a cat")
+	MOCK.stabled, MOCK.stableActive = {}, nil
+	ns.cdb.pets["Fang|2"], ns.cdb.pets["Other|2"], ns.cdb.pets["Other|0"] = nil, nil, nil
+	ns:Update(); flush()
+end)
+
+step("rough edges: level ? on tooltips, a failing waypoint, the map pin's edge", function()
+	-- a tameable beast whose level nobody reported: no "level 0"
+	local id
+	for npc, t in pairs(ns.Data.tameable) do if (t[2] or 0) == 0 then id = npc break end end
+	if id then
+		local lines = ns.TameLines(id, nil, 20)
+		check(lines and lines.note == nil and lines.tooHigh == nil, "no level line for " .. id)
+	end
+	-- the game's waypoint call errors: a miss, not "waypoint set"
+	local real = C_Map.SetUserWaypoint
+	C_Map.SetUserWaypoint = function() error("not on this map") end
+	eq(ns.SetWaypoint(1433, 0.5, 0.5, "x"), nil)
+	C_Map.SetUserWaypoint = real
+	-- a pin's edge: the surest of its ranks
+	local c, st = ns.MapPins.Edge({ { state = "classic" }, { state = "confirmed" } })
+	eq(st, "confirmed")
+	local _, st2 = ns.MapPins.Edge({ { state = "classic" } })
+	eq(st2, "classic")
 end)
 
 step("after everything: still no reads of missing globals, no stray writes", function()

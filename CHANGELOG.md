@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+- Bestiary: beasts whose level nobody has reported yet ("level ?", WoW Forever's new ones) now come last instead of first. Among beasts of the same level, the ones known to teach something come first.
+- Bestiary data refreshed from EverlookDB: more spawn spots seen in WoW Forever, a few more levels, and rare beasts marked rare (Barnabus). A beast no longer lists a whole continent ("Eastern Kingdoms") as one of its zones.
+- Settings: "Use the raid warning sound instead" is on the Settings page now, so the settings search finds it too.
+- Tooltips no longer say "level 0" for a tameable beast whose level isn't known.
+- Right after logging in or calling your pet, a pet the game hasn't named yet is no longer saved (or announced in chat) as "Unknown". The name is picked up as soon as it arrives, and a rename shows at once.
+- The stable: your other pets are no longer forgotten when the game hands over only half the stable list, and on a non-English client a stabled pet keeps its family.
+- Set waypoint: when the game refuses the waypoint, the beast page says so instead of claiming it was set.
+- Bestiary and pet page cards: the second line no longer runs under the star or the Where? button, and a two-line "nothing here" text gets room.
+- Clearer wording: the empty "What it teaches" on a beast page, and the tooltip setting mentions what a beast teaches.
+
 ## v0.4.1 (2026-11-21)
 - The addon has its own icon in the addon list, in the EverlookDB style (the database stack with a paw).
 
