@@ -23,6 +23,7 @@ Alerts.lua
 Tooltip.lua
 Cards.lua
 Browser.lua
+Recent.lua
 Options.lua
 MapPins.lua
 LevelUp.lua

@@ -86,7 +86,8 @@ ns.DEFAULTS = {
 	levelFamilyList = {},      -- { [family id] = true } for "these"
 }
 -- wishlist: { [npc id] = true } (the bestiary's star); tamed: { [npc id] = times } (your own tames, for "tamed by you")
-ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {} }
+-- recent: the Recent page's messages (Recent.lua), recentUnread: how many came since you looked
+ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {}, recent = {}, recentUnread = 0 }
 
 local function fill(dst, defaults)
 	for k, v in pairs(defaults) do

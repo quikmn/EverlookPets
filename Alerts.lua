@@ -44,16 +44,19 @@ function A:Check(st)
 		local who = p.name or "Your pet"
 		if prev == nil or #news > 3 then
 			-- a pet seen for the first time (or a big change): one line, not a wall
-			ns:Print(("%s: %d thing%s to do for its abilities. %s shows them."):format(who, #news, #news == 1 and "" or "s", ns.SLASH))
+			local more = {}
+			for _, row in ipairs(news) do more[#more + 1] = row.name .. ": " .. Logic.ChatLine(row) end
+			ns.Tell("pet", ("%s: %d thing%s to do for its abilities. %s shows them."):format(who, #news, #news == 1 and "" or "s", ns.SLASH),
+				{ pet = p.name, more = more })
 		else
-			for _, row in ipairs(news) do ns:Print(who .. ": " .. Logic.ChatLine(row)) end
+			for _, row in ipairs(news) do ns.Tell("pet", who .. ": " .. Logic.ChatLine(row), { pet = p.name }) end
 		end
 	end
 
 	-- the pet lagging behind: once when it starts, again only after it caught up
 	local lagText = Logic.LagText(res.lag, ns.db.lagWarn)
 	if lagText and not ns.cdb.lagNoted[key] and ns.db.chat then
-		ns:Print(lagText .. ". Pets learn faster from kills near their own level.")
+		ns.Tell("pet", lagText .. ". Pets learn faster from kills near their own level.", { pet = p.name })
 	end
 	ns.cdb.lagNoted[key] = lagText and true or nil
 	self:Draw()
@@ -84,7 +87,8 @@ function A.OnLink(link)
 	if not e then return true end
 	if action == "wp" then
 		local how, _, text = ns.Browser.Waypoint(e)
-		if not how and text then ns:Print(text) end -- a waypoint shows on the map and the screen; only a miss is said
+		-- a waypoint shows on the map and the screen; only a miss is said
+		if not how and text then ns.Tell("beast", text, { npc = e.id }) end
 	elseif action == "beast" then
 		ns.Browser.OpenBeast(e)
 	end
@@ -163,6 +167,8 @@ function A:SeeUnit(unit)
 	self.nearSaid[npc] = now
 	local e = ns.Bestiary.Get(ns.Data, npc)
 	A.SetTarget(e and (ns.Str((ns.Call(UnitName, unit))) or e.name))
+	-- the Recent page keeps the line (and the beast's id, for Waypoint and Open beast), not the links
+	ns.Recent.Add("beast", line, { npc = npc })
 	ns:Print(GOLD .. line .. "|r " .. (e and A.NearExtras(e) or ""))
 	if ns.db.alertSound then
 		local id = ns.db.alertLoud and A.SOUND_LOUD or A.SOUND_SOFT
@@ -224,6 +230,8 @@ function A:Tooltip(tip)
 	end
 	tip:AddLine(" ")
 	tip:AddLine(MUTED .. "Click: open " .. ns.NAME .. "|r")
+	local n = ns.Recent and ns.Recent.Unread() or 0
+	tip:AddLine(MUTED .. "Right-click: Recent messages" .. (n > 0 and (" (" .. n .. " new)") or "") .. "|r")
 end
 
 ------------------------------------------------------------------------
@@ -236,7 +244,10 @@ function A:SetupBroker()
 	if not LDB or ldb or not ns.IsHunter() then return end
 	ldb = LDB:NewDataObject(ns.PREFIX, {
 		type = "data source", label = "Pet", text = "", icon = ns.ICON,
-		OnClick = function() if ns.app then ns.app:Toggle() end end,
+		-- right-click: the Recent page (everything the addon told you)
+		OnClick = function(_, button)
+			if button == "RightButton" then ns.Recent.Open() elseif ns.app then ns.app:Toggle() end
+		end,
 		OnTooltipShow = function(tip) A:Tooltip(tip) end,
 	})
 end
@@ -287,7 +298,9 @@ function A:SetupMinimap()
 	b.badge.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
 	b.badge.text:SetPoint("CENTER", 0, 0)
 	b.badge:Hide()
-	b:SetScript("OnClick", function() if ns.app then ns.app:Toggle() end end)
+	b:SetScript("OnClick", function(_, button)
+		if button == "RightButton" then ns.Recent.Open() elseif ns.app then ns.app:Toggle() end
+	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		A:Tooltip(GameTooltip)

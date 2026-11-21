@@ -5,7 +5,7 @@
 --     items() -> array; icon(item); title(item); sub(item) (second line); chips(item) -> { { text, edge = {r,g,b},
 --     color = {r,g,b}, tip = { lines }, onClick(chip) } } (third line, as many as fit); star = { get(item), set(item, on), tip }; buttons = { { label | fn(item),
 --     width, onClick(item), shown(item) } }; onClick(item); tooltip(item) -> lines; empty; rowHeight; page (rows
---     per page, default 40).
+--     per page, default 40); titleLines (the title may wrap to this many lines, default 1).
 --   The returned frame has :Refresh() and :ResetPage() (back to the first page, after the search changed).
 local _, ns = ...
 local UI = ns.UI
@@ -105,6 +105,7 @@ function ns.Cards(stack, opt)
 			right = right - 28
 		end
 		r.buttons = {}
+		r.btnRight = right
 		for bi = #(opt.buttons or {}), 1, -1 do
 			local d = opt.buttons[bi]
 			local b = UI.Button(r, type(d.label) == "string" and d.label or "", function(btn) if r.item ~= nil then d.onClick(r.item, btn) end end, d.width or 80)
@@ -114,7 +115,9 @@ function ns.Cards(stack, opt)
 			r.buttons[bi] = b
 		end
 		r.title = UI.Text(r, T.font, T.text)
-		r.title:SetWordWrap(false)
+		r.title:SetWordWrap((opt.titleLines or 1) > 1)
+		if (opt.titleLines or 1) > 1 and r.title.SetMaxLines then r.title:SetMaxLines(opt.titleLines) end
+		r.title:SetJustifyH("LEFT")
 		r.title:SetPoint("TOPLEFT", x, -8)
 		r.title:SetPoint("RIGHT", right - 4, 0)
 		r.sub = UI.Text(r, T.fontSmall + 1, T.muted)
@@ -190,10 +193,22 @@ function ns.Cards(stack, opt)
 				if r.star.tex.SetDesaturated then r.star.tex:SetDesaturated(not on) end
 				r.star.tex:SetAlpha(on and 1 or 0.3)
 			end
-			for bi, d in ipairs(opt.buttons or {}) do
-				local b = r.buttons[bi]
+			-- the shown buttons sit together on the right (a hidden one leaves no gap), the text runs up to them
+			local right = r.btnRight
+			for bi = #(opt.buttons or {}), 1, -1 do
+				local d, b = opt.buttons[bi], r.buttons[bi]
 				if type(d.label) == "function" then b:SetText(d.label(item)) end
-				b:SetShown(not d.shown or d.shown(item) and true or false)
+				local show = not d.shown or d.shown(item) and true or false
+				b:SetShown(show)
+				if show then
+					b:ClearAllPoints()
+					b:SetPoint("TOPRIGHT", right, -8)
+					right = right - (d.width or 80) - 6
+				end
+			end
+			if opt.buttons then
+				r.title:SetPoint("RIGHT", right - 4, 0)
+				r.sub:SetPoint("RIGHT", right - 4, 0)
 			end
 			if opt.chips then fillChips(r, opt.chips(item)) end
 			r:Show()

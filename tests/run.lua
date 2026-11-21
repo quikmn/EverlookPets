@@ -1462,6 +1462,220 @@ step("level up card: waits for the end of a fight; nothing new shows nothing; no
 	ns:Update(); flush()
 end)
 
+------------------------------------------------------------------------
+-- The Recent page: everything the addon told you
+------------------------------------------------------------------------
+local R = ns.Recent
+
+step("recent: the times read like a person says them", function()
+	local at = os.time({ year = 2026, month = 11, day = 21, hour = 22, min = 30, sec = 0 })
+	eq(R.Ago(at - 20, at), "just now")
+	eq(R.Ago(at - 12 * 60, at), "12m ago")
+	eq(R.Ago(at - 3 * 3600, at), "3h ago")
+	eq(R.Ago(os.time({ year = 2026, month = 11, day = 21, hour = 9, min = 5 }), at), "today 09:05")
+	eq(R.Ago(os.time({ year = 2026, month = 11, day = 20, hour = 21, min = 14 }), at), "yesterday 21:14")
+	check(R.Ago(os.time({ year = 2026, month = 11, day = 18, hour = 21, min = 14 }), at):find("^%a%a%a 21:14$"), "a weekday")
+	eq(R.Ago(os.time({ year = 2026, month = 11, day = 2, hour = 8, min = 0 }), at), "2 Nov 08:00")
+	eq(R.Plain("|cffffd200Rare|r |cff71d5ff|Haddon:EverlookPets:wp:5|h[Waypoint]|h|r"), "Rare [Waypoint]")
+end)
+
+step("recent: keeps what the addon told you, newest 100, nothing about where a spawn is", function()
+	R.Clear()
+	eq(#R.List(), 0)
+	eq(R.Unread(), 0)
+	if ns.app:IsShown() then ns.app:Close() end
+	-- a beast near you: kept with its npc id only
+	MOCK.time = MOCK.time + 1000
+	ns.db.wishAlert, ns.db.rareAlert = true, true
+	MOCK.units.nameplate1 = { guid = "Creature-0-1-0-1-14279-0000AAAA", class = "rare" }
+	MOCK.Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local list = R.List()
+	eq(#list, 1, "the near alert is kept")
+	local e = list[1]
+	eq(e.k, "beast"); eq(e.npc, 14279)
+	check(e.x:find("Creepthess (rare Spider", 1, true) and not e.x:find("|H", 1, true) and not e.x:find("Waypoint", 1, true), e.x)
+	check(type(e.t) == "number" and e.t > 0, "a time")
+	for k in pairs(e) do check(({ t = 1, k = 1, x = 1, npc = 1 })[k], "only time, kind, text, npc: " .. k) end
+	eq(R.Unread(), 1, "one unread")
+	check(not ns.app:IsShown(), "it never opens the window by itself")
+	-- a waypoint that can't be set: kept too
+	local saved = ns.Bestiary.BestSpot
+	ns.Bestiary.BestSpot = function() return nil end
+	ns.Alerts.OnLink("addon:EverlookPets:wp:505")
+	ns.Bestiary.BestSpot = saved
+	eq(#R.List(), 2)
+	eq(R.List()[2].k, "beast"); eq(R.List()[2].npc, 505)
+	check(R.List()[2].x:find("No spawn point known", 1, true), R.List()[2].x)
+	-- command output is not kept
+	local n = #R.List()
+	slash("check"); slash("wishlist"); slash("help"); slash("status")
+	eq(#R.List(), n, "command echo and help are left out")
+	-- never more than 100, the oldest go
+	for i = 1, 120 do R.Add("pet", "line " .. i, { pet = "Rex" }) end
+	eq(#R.List(), R.MAX)
+	eq(R.List()[R.MAX].x, "line 120", "newest last in the saved list")
+	eq(R.List()[1].x, "line 21", "the oldest dropped")
+	eq(R.Items()[1].x, "line 120", "the page lists the newest first")
+	eq(R.Unread(), R.MAX, "the count stops at 100")
+	-- odd data is not kept: a GUID, a position
+	e = R.Add("beast", "x", { npc = 505, guid = "Creature-0-1-0-1-505-0000BBBB", map = 1433, x = 0.5, spawn = "abc" })
+	check(e.guid == nil and e.map == nil and e.x == "x" and e.spawn == nil, "only the npc id")
+	R.Clear()
+	eq(#R.List(), 0); eq(R.Unread(), 0)
+end)
+
+step("recent: pet lines and the level-up card are kept; asked-for cards are not", function()
+	R.Clear()
+	local saved = { pet = MOCK.pet, level = MOCK.playerLevel, knows = MOCK.hunterKnows }
+	MOCK.pet = { name = "Shadowclaw", family = "Cat", familyId = 2, level = 40, knows = set(16831, 17259, 23109, 24452, 14918, 4191) }
+	MOCK.playerLevel = 40
+	MOCK.hunterKnows = {}
+	ns.cdb.alerted["Shadowclaw|2"] = nil
+	ns:Update(); flush()
+	local pets = R.Items("pet")
+	check(#pets >= 1 and pets[1].pet == "Shadowclaw", "the pet's chat line is kept: " .. tostring(pets[1] and pets[1].x))
+	LU.Hide()
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	check(LU.frame:IsShown(), "the card")
+	eq(strip(LU.frame.hint:GetText()), "Missed it? /epets recent", "the card's hint")
+	local lv = R.Items("levelup")
+	eq(#lv, 1, "the card is kept")
+	eq(lv[1].lv, 40)
+	check(lv[1].x:find("Level 40!", 1, true) and lv[1].x:find("Claw", 1, true), lv[1].x)
+	check(lv[1].more and #lv[1].more >= 1, "every rank for the tooltip")
+	-- asked for (/epets levelup) or Show card: not kept again
+	slash("levelup")
+	eq(#R.Items("levelup"), 1, "asked for: not kept")
+	LU.Hide()
+	-- Show card: the card for that level again
+	eq(R.ShowCard(lv[1]), "card")
+	check(LU.frame:IsShown() and LU.frame.content.level == 40, "shown again")
+	eq(#R.Items("levelup"), 1)
+	LU.Hide()
+	-- the chat line instead of the card: kept the same way
+	slash("levelchat on")
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	eq(#R.Items("levelup"), 2, "the chat line is kept")
+	slash("levelchat off")
+	MOCK.pet, MOCK.playerLevel, MOCK.hunterKnows = saved.pet, saved.level, saved.knows
+	ns.cdb.pets["Shadowclaw|2"], ns.cdb.alerted["Shadowclaw|2"], ns.cdb.unseen["Shadowclaw|2"], ns.cdb.lagNoted["Shadowclaw|2"] = nil, nil, nil, nil
+	ns:Update(); flush()
+end)
+
+step("recent page: high in the sidebar, cards with buttons, chips, the count, Clear", function()
+	-- a beast with spots, a level-up, a pet line
+	R.Clear()
+	R.Add("levelup", "Level 40! Claw 6 for Shadowclaw", { level = 40 })
+	R.Add("pet", "Shadowclaw: Bite 7 opens", { pet = "Shadowclaw" })
+	R.Add("beast", "Greater Tarantula (Spider, level 19-20) is near.", { npc = 505 })
+	eq(R.Unread(), 3)
+	if ns.app:IsShown() then ns.app:Close() end
+	slash("")
+	ns.app:ShowSection("pet")
+	local nav = ns.app.window.navButtons
+	check(nav.recent, "a sidebar entry")
+	-- near the top: right after Your pet
+	eq(ns.app.order[1], "pet"); eq(ns.app.order[2], "recent")
+	check(nav.recent.count and nav.recent.count:IsShown(), "the count shows")
+	eq(nav.recent.count.text:GetText(), "3")
+	-- /epets recent: the page, and the count goes
+	slash("recent")
+	eq(ns.app.current, "recent")
+	eq(R.Unread(), 0, "seen")
+	check(not nav.recent.count:IsShown(), "no count once seen")
+	-- a new message while you look at it: not unread
+	R.Add("pet", "while looking", { pet = "Shadowclaw" })
+	eq(R.Unread(), 0, "seen at once")
+	R.List()[#R.List()] = nil
+	ns.app:Refresh()
+	local list = R.list
+	eq(list.shownCount, 3, "three cards")
+	local rows = list.rows
+	check(strip(rows[1].title:GetText()):find("Greater Tarantula", 1, true), "newest first")
+	check(strip(rows[1].sub:GetText()):find("just now", 1, true) and strip(rows[1].sub:GetText()):find("Beast nearby", 1, true), strip(rows[1].sub:GetText()))
+	-- buttons by kind: beast Waypoint + Open beast; pet: Your pet; level-up: Show card
+	local function shown(r)
+		local t = {}
+		for _, b in ipairs(r.buttons) do if b:IsShown() then t[#t + 1] = strip(b:GetText()) end end
+		return table.concat(t, ",")
+	end
+	eq(shown(rows[1]), "Waypoint,Open beast")
+	eq(shown(rows[2]), "Your pet")
+	eq(shown(rows[3]), "Show card")
+	-- Waypoint: set again, said on the page (no chat line)
+	MOCK.waypoint = nil
+	local before = #MOCK.log
+	rows[1].buttons[2].__scripts.OnClick(rows[1].buttons[2])
+	check(MOCK.waypoint and MOCK.waypoint.uiMapID == 1433, "waypoint set again")
+	eq(#MOCK.log, before, "no chat line")
+	check(R.note and R.note.text:find("Waypoint", 1, true), "the page says so")
+	-- Open beast
+	rows[1].buttons[3].__scripts.OnClick(rows[1].buttons[3])
+	eq(ns.app.current, "beast"); eq(ns.Browser.current.id, 505)
+	slash("recent")
+	-- Show card
+	LU.Hide()
+	rows[3].buttons[1].__scripts.OnClick(rows[3].buttons[1])
+	check(LU.frame:IsShown() and LU.frame.content.level == 40, "Show card")
+	check(ns.app:IsShown(), "the window stays open")
+	LU.Hide()
+	-- Your pet
+	rows[2].buttons[4].__scripts.OnClick(rows[2].buttons[4])
+	eq(ns.app.current, "pet")
+	slash("recent")
+	-- the chips
+	local chips = R.chips.chips
+	eq(#chips, 4)
+	check(strip(chips[1].text:GetText()):find("^All"), "All first")
+	chips[3].__scripts.OnClick(chips[3]) -- Beasts nearby
+	eq(R.filter, "beast")
+	eq(list.shownCount, 1, "one beast")
+	chips[2].__scripts.OnClick(chips[2])
+	eq(list.shownCount, 1, "one level-up")
+	chips[4].__scripts.OnClick(chips[4])
+	eq(list.shownCount, 1, "one pet line")
+	chips[1].__scripts.OnClick(chips[1])
+	eq(list.shownCount, 3)
+	-- Clear: plain, asks first
+	local clear = R.chips.clear
+	clear.__scripts.OnClick(clear)
+	eq(#R.List(), 3, "the first click only asks")
+	clear.__scripts.OnClick(clear)
+	eq(#R.List(), 0, "cleared")
+	eq(list.shownCount, 0)
+	-- the settings search finds the page
+	for _, w in ipairs({ "recent", "missed", "messages", "history" }) do
+		check(#ns.app:Search(w) > 0, "the search finds " .. w)
+	end
+	ns.app:Search("")
+	ns.app:Close()
+end)
+
+step("recent: right-click on the bar plugin and the minimap button; the command's aliases", function()
+	local LDB = LibStub("LibDataBroker-1.1")
+	local obj = LDB:GetDataObjectByName("EverlookPets")
+	check(obj, "the plugin")
+	if ns.app:IsShown() then ns.app:Close() end
+	obj.OnClick(nil, "RightButton")
+	check(ns.app:IsShown() and ns.app.current == "recent", "right-click: Recent")
+	ns.app:Close()
+	obj.OnClick(nil, "LeftButton")
+	check(ns.app:IsShown() and ns.app.current ~= "recent" or ns.app:IsShown(), "left-click: the window")
+	ns.app:Close()
+	local b = _G.EverlookPetsMinimapButton
+	if b then
+		b.__scripts.OnClick(b, "RightButton")
+		check(ns.app:IsShown() and ns.app.current == "recent", "minimap right-click: Recent")
+		ns.app:Close()
+	end
+	slash("missed")
+	check(ns.app:IsShown() and ns.app.current == "recent", "/epets missed")
+	ns.app:Close()
+	mark = #MOCK.log
+	slash("help")
+	check(has(logSince(mark), "/epets recent"), "help lists it")
+end)
+
 step("after everything: still no reads of missing globals, no stray writes", function()
 	for k in pairs(missingReads) do error("read missing global " .. k) end
 	for k in pairs(globalWrites) do check(ALLOWED[k], "wrote global " .. k) end

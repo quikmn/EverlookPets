@@ -145,7 +145,8 @@ function O.FamilyOrder()
 	for id in pairs(ns.Data.families) do
 		local names = mine[id]
 		if names then table.sort(names) end
-		out[#out + 1] = { id = id, name = ns.FamilyName(id) or ns.Data.families[id].key, pets = names and table.concat(names, ", ") or nil }
+		out[#out + 1] = { id = id, name = ns.FamilyName(id) or ns.Data.families[id].key, pets = names and table.concat(names, ", ") or nil,
+			first = names and names[1], n = names and #names or 0 }
 	end
 	table.sort(out, function(a, b)
 		if (a.pets ~= nil) ~= (b.pets ~= nil) then return a.pets ~= nil end
@@ -159,7 +160,6 @@ function O.SetFamily(id, on)
 	ns.db.levelFamilyList[id] = on and true or nil
 end
 
-local CHECK = "Interface\Buttons\UI-CheckBox-Check"
 function O.FamilyGrid(stack)
 	local U = UI.Util
 	local f = CreateFrame("Frame")
@@ -176,10 +176,10 @@ function O.FamilyGrid(stack)
 		b.sq:SetPoint("LEFT", 2, 0)
 		U.Solid(b.sq, "BACKGROUND", T.surfaceHi[1], T.surfaceHi[2], T.surfaceHi[3], 1):SetAllPoints()
 		b.edge = U.Border(b.sq, 1, T.border[1], T.border[2], T.border[3], 1)
-		b.tick = b.sq:CreateTexture(nil, "OVERLAY")
-		b.tick:SetSize(18, 18)
-		b.tick:SetPoint("CENTER", 1, 0)
-		b.tick:SetTexture(CHECK)
+		-- ticked: a filled square in the accent colour
+		b.tick = U.Solid(b.sq, "ARTWORK", T.accent[1], T.accent[2], T.accent[3], 1)
+		b.tick:SetPoint("TOPLEFT", 3, -3)
+		b.tick:SetPoint("BOTTOMRIGHT", -3, 3)
 		b.text = UI.Text(b, T.font, T.text)
 		b.text:SetPoint("LEFT", b.sq, "RIGHT", 8, 0)
 		b.text:SetPoint("RIGHT", -4, 0)
@@ -216,7 +216,7 @@ function O.FamilyGrid(stack)
 			b:SetWidth(w - 6)
 			b:ClearAllPoints()
 			b:SetPoint("TOPLEFT", ((i - 1) % COLS) * w, -math.floor((i - 1) / COLS) * ROWH)
-			b.text:SetText(fam.name .. (fam.pets and ("  |cff8d94a3" .. fam.pets .. "|r") or ""))
+			b.text:SetText(fam.name .. (fam.pets and ("  |cff8d94a3" .. fam.first .. (fam.n > 1 and (" +" .. (fam.n - 1)) or "") .. "|r") or ""))
 			b.tick:SetShown(chosen[fam.id] and true or false)
 			b.edge:SetColor(rgbaOf(chosen[fam.id] and T.accent or T.border))
 			b:Show()
@@ -471,8 +471,9 @@ app:Section("pet", "Your pet", function(stack)
 end)
 
 ------------------------------------------------------------------------
--- Page: bestiary (Browser.lua)
+-- Page: recent (Recent.lua), high in the sidebar; then the bestiary (Browser.lua)
 ------------------------------------------------------------------------
+ns.Recent.AddPage(app)
 ns.Browser.AddBestiary(app)
 
 ------------------------------------------------------------------------
@@ -480,6 +481,12 @@ ns.Browser.AddBestiary(app)
 ------------------------------------------------------------------------
 app:Section("settings", "Settings", function(stack)
 	UI.Header(stack, "Alerts")
+	UI.ButtonRow(stack, {
+		{ label = "Recent messages", width = 150,
+			desc = "Everything " .. ns.NAME .. " told you (level-up cards, beasts near you, your pet), newest first, with buttons to show the card or set the waypoint again. Also " .. ns.SLASH .. " recent, or right-click the minimap button or the bar plugin.",
+			onClick = function() app:ShowSection("recent") end },
+		keywords = { "recent", "missed", "messages", "history", "log", "alerts", "chat lines" },
+	})
 	app:Widget(stack, "chat")
 	app:Widget(stack, "lag")
 	app:Widget(stack, "minimap")
@@ -506,7 +513,7 @@ app:Section("settings", "Settings", function(stack)
 	UI.Header(stack, "Chat commands")
 	UI.Note(stack, ns.SLASH .. "  this window\n" .. ns.SLASH .. " check  what to do now, in chat\n" .. ns.SLASH
 		.. " chat off, lag 5, minimap off, tooltip off  change a setting\n" .. ns.SLASH .. " get  every setting\n"
-		.. ns.SLASH .. " levelup  what's new at your level, on the level-up card\n" .. ns.SLASH .. " beasts <words>  the Bestiary with that search (bite 6, cat, rare)\n" .. ns.SLASH .. " wishlist  your starred beasts\n"
+		.. ns.SLASH .. " levelup  what's new at your level, on the level-up card\n" .. ns.SLASH .. " recent  everything the addon told you (missed a message?)\n" .. ns.SLASH .. " beasts <words>  the Bestiary with that search (bite 6, cat, rare)\n" .. ns.SLASH .. " wishlist  your starred beasts\n"
 		.. ns.SLASH .. " search <words>  find a setting\n" .. ns.SLASH .. " status, version, help")
 end)
 
@@ -553,6 +560,10 @@ app:Command("levelup", "levelup", "what's new for you and your pet at your level
 	ns:Update()
 	ns.LevelUp.Show(nil, true)
 end, { "lvl", "ding" })
+
+app:Command("recent", "recent", "everything the addon told you lately, with buttons to show the card or set the waypoint again", function()
+	ns.Recent.Open()
+end, { "missed", "messages", "history", "log" })
 
 app:Command("beasts", "beasts [words]", "the Bestiary, with a search (bite 6, cat, stranglethorn, rare)", function(rest)
 	ns.Browser.OpenSearch(tostring(rest or ""):gsub("^%s+", ""):gsub("%s+$", ""))

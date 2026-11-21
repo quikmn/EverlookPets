@@ -238,10 +238,16 @@ function LU.Targets(D, mode, chosen, pets, cur, lastKey)
 	return out
 end
 
+-- "Bat, Boar, Wolf" (three at most, then "+N").
+function LU.FamilyList(names)
+	if #names <= 3 then return table.concat(names, ", ") end
+	return ("%s, %s, %s +%d"):format(names[1], names[2], names[3], #names - 3)
+end
+
 -- LU.PetNews for each of s.targets (LU.Targets), in their order. Each item knows its family (famId, famName with
 -- s.multi) and its pet (petName). The pet trainer's ranks: the first target's, when it is a pet of yours.
 function LU.TargetNews(D, s)
-	local pet, trainer = {}, {}
+	local pet, trainer, shared = {}, {}, {}
 	for i, t in ipairs(s.targets) do
 		local ss = {}
 		for k, v in pairs(s) do ss[k] = v end
@@ -258,7 +264,22 @@ function LU.TargetNews(D, s)
 		for _, it in ipairs(p) do
 			it.famId, it.petName = t.familyId, t.name
 			if s.multi then it.famName = famName end
-			pet[#pet + 1] = it
+			if t.key then
+				pet[#pet + 1] = it
+			elseif it.kind == "tame" or it.kind == "tameunknown" then
+				-- a family you have no pet of: only a beast to tame is news (you'd teach the ranks you know to a new pet
+				-- anyway), and a rank many families share is one row: "Bat, Boar, Wolf: Bite rank 6"
+				local id = it.key .. "#" .. it.rank.rank
+				local same = shared[id]
+				if same then
+					same.fams[#same.fams + 1] = famName
+					same.famName = LU.FamilyList(same.fams)
+				else
+					it.fams = { famName }
+					shared[id] = it
+					pet[#pet + 1] = it
+				end
+			end
 		end
 		if i == 1 and t.key then trainer = tr end
 	end
@@ -323,7 +344,8 @@ function LU.PetSub(it, c)
 	elseif it.kind == "tame" then
 		local t = it.beasts[1]
 		local zone = t.zone and t.zone ~= 0 and B.ZoneName(ns.Data, t.zone, ns.MapName) or nil
-		s = ("Tame a %s (%s%s) to learn it"):format(t.name ~= "" and t.name or "beast", levels(t), zone and (", " .. zone) or "")
+		local name = t.name ~= "" and t.name or "beast"
+		s = ("Tame %s %s (%s%s) to learn it"):format(name:match("^[AEIOUaeiou]") and "an" or "a", name, levels(t), zone and (", " .. zone) or "")
 	else
 		s = "Tame a beast that knows it" .. MUTED .. ((it.beasts and it.beasts[1]) and (" (from level " .. it.beasts[1].lo .. ")") or " (no beast reported yet)") .. "|r"
 	end
@@ -492,7 +514,7 @@ local function makeCard()
 	f.note = UI.Text(f, T.fontSmall + 1, T.muted)
 	f.note:SetWidth(W - 2 * PAD)
 	f.hint = UI.Text(f, T.fontSmall, T.muted)
-	f.hint:SetText(ns.SLASH .. " levelup shows this again")
+	f.hint:SetText("Missed it? " .. ns.SLASH .. " recent")
 	f.primary = UI.Button(f, "Pin nearest trainer", function() LU.PinTrainer() end, 150, "accent")
 	f.primary:SetPoint("BOTTOMRIGHT", -PAD, 14)
 	f.open = UI.Button(f, "Open in " .. ns.NAME, function() LU.OpenPage() end, 170)
@@ -785,10 +807,12 @@ function LU.Show(level, forced)
 		return "none"
 	end
 	if not forced and ns.db.levelChat then
-		ns:Print(LU.ChatLine(c))
+		ns.Tell("levelup", LU.Summary(c), { level = c.level, more = LU.Lines(c) })
 		return "chat"
 	end
 	if not forced and not ns.db.levelCard then return "none" end
+	-- the Recent page keeps what the card showed (not when you asked for it: /epets levelup, Show card)
+	if not forced then ns.Recent.Add("levelup", LU.Summary(c), { level = c.level, more = LU.Lines(c) }) end
 	if card then card.noteText = nil end
 	local f = LU.Fill(c)
 	place(f)

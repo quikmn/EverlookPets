@@ -89,6 +89,7 @@ Bugs and ideas: [Issues](https://github.com/quikmn/EverlookPets/issues), or `/ep
 - `/epets` opens the window (also under Settings > AddOns). `/everlookpets` works too.
 - `/epets check` lists what to do now in chat.
 - `/epets levelup` shows the level-up card for your level (what's new for you and your pet).
+- `/epets recent` opens the Recent page: everything the addon told you (level-up cards, beasts near you, your pet), newest first, with buttons to show the card or set the waypoint again. Right-click the minimap button or the bar plugin for the same.
 - `/epets levelcard off`, `/epets levelchat on`: no level-up card, or one chat line instead of it.
 - `/epets chat off`, `/epets lag 5`, `/epets minimap off`, `/epets tooltip off`, `/epets locked off`: settings from
   chat (`/epets get` lists them all).
