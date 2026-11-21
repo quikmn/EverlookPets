@@ -1,48 +1,42 @@
 # Changelog
 
 ## v0.6.0 (2026-11-21)
-- Missed a message? /epets recent (or Recent in the window) lists everything the addon told you, with buttons to show the card or set the waypoint again.
-- The level-up card now only shows new ranks for your pet by default; switch on pet trainer, hunter trainer and new spells in the settings if you want them.
-- The new ranks on the level-up card can cover your current pet's family (the default; with no pet out, the last one you had out), families you tick ("These families", your own pets' families listed first), or all families, each rank marked with its family ("Cat: Claw rank 6"). The card keeps to four rows, then "and N more".
-- Tooltip: the Tameable lines use the shared EverlookDB tooltip look. New setting "Solid tooltip background" (on by default), shared by every EverlookDB addon.
+- New: `/epets recent` (or Recent in the window) lists everything the addon told you, with buttons to show the card or set the waypoint again.
+- The level-up card shows new pet ranks only by default; trainer ranks and new spells can be switched on in the settings.
+- The level-up card can cover your current pet's family, families you pick, or all families. It keeps to four rows, then "and N more".
+- Tooltips get the EverlookDB look, with a new "Solid tooltip background" setting (on by default).
 
 ## v0.5.1 (2026-11-21)
-- Waypoints in the bestiary now lead to where WoW Forever players actually see a beast; older classic spawn data is only used when we have nothing else, and says so.
+- Bestiary waypoints now lead to where WoW Forever players actually see a beast; older classic spawn data is only used when there's nothing else, and says so.
 
 ## v0.5.0 (2026-11-21)
-- The addon is now called EverlookDB Pets (was Everlook Pets), like the rest of the EverlookDB family. Settings, commands and the folder stay the same.
-- **Level-up card.** When your hunter levels up, a card near the top of the screen says what's new: "Level 40! Here's what's new for you and Shadowclaw". First, the new ranks your pet's family can learn at that level and your pet doesn't have: "New: Claw rank 6 for Shadowclaw. Tame a Silt Crawler (level 40-41, Swamp of Sorrows) to learn it", with a Pin button that puts a waypoint on that beast's nearest spawn spot (TomTom's when it's loaded, else the game's map pin). If you already know the rank, it says to teach it to your pet instead; if another of your pets knows it, it names that pet. Then the hunter trainer's new spells and ranks, with icons, what they cost in all and the nearest trainer of your faction, and the ranks to buy from a pet trainer (Growl, Great Stamina, the resistances...). "Pin nearest trainer" puts a waypoint on the hunter trainer; "Open in EverlookDB Pets" opens your pet's page.
-- The card is calm: no sound, never in the middle of a fight (it waits until the fight ends), and nothing at all at a level where nothing is new. Drag it anywhere and it stays there; close it with its X or Escape. It never closes another window.
-- `/epets levelup` shows the card for your level again. Settings: "Show the level-up card when I level up" and "Level up: one chat line instead of the card".
+- The addon is now called EverlookDB Pets (was Everlook Pets). Settings, commands and the folder stay the same.
+- New level-up card: when you level up, it shows the new ranks your pet can learn and where to tame them, the hunter trainer's new spells and the ranks to buy from a pet trainer, with Pin buttons for waypoints.
+- The card never plays a sound, waits until a fight ends, and stays quiet when nothing is new. Drag it anywhere; close it with X or Escape.
+- `/epets levelup` shows the card again. Settings turn it off or give one chat line instead.
 
 ## v0.4.2 (2026-11-21)
-- Petopia links removed: the Petopia button on Your pet, the Petopia line in a row's tooltip and the Petopia box on Data and links. A tame nobody has reported a beast for now points to EverlookDB's pet page.
-- Bestiary: beasts whose level nobody has reported yet ("level ?", WoW Forever's new ones) now come last instead of first. Among beasts of the same level, the ones known to teach something come first.
-- Bestiary data refreshed from EverlookDB: more spawn spots seen in WoW Forever, a few more levels, and rare beasts marked rare (Barnabus). A beast no longer lists a whole continent ("Eastern Kingdoms") as one of its zones.
-- Settings: "Use the raid warning sound instead" is on the Settings page now, so the settings search finds it too.
-- Tooltips no longer say "level 0" for a tameable beast whose level isn't known.
-- Right after logging in or calling your pet, a pet the game hasn't named yet is no longer saved (or announced in chat) as "Unknown". The name is picked up as soon as it arrives, and a rename shows at once.
-- The stable: your other pets are no longer forgotten when the game hands over only half the stable list, and on a non-English client a stabled pet keeps its family.
-- Set waypoint: when the game refuses the waypoint, the beast page says so instead of claiming it was set.
-- Bestiary and pet page cards: the second line no longer runs under the star or the Where? button, and a two-line "nothing here" text gets room.
-- Clearer wording: the empty "What it teaches" on a beast page, and the tooltip setting mentions what a beast teaches.
+- A tame nobody has reported a beast for now points to EverlookDB's pet page.
+- Bestiary: beasts with an unknown level come last; among equal levels, beasts known to teach something come first.
+- Bestiary data refreshed: more spawn spots, more levels, rare beasts marked rare, and no more whole continents listed as a zone.
+- Tooltips no longer say "level 0" for a beast whose level isn't known.
+- Fixed: a pet showing up as "Unknown" right after login, stabled pets being forgotten, and stabled pets losing their family on non-English clients.
+- Set waypoint says so when the game refuses the waypoint.
+- Layout and wording fixes on cards, the beast page and settings.
 
 ## v0.4.1 (2026-11-21)
-- The addon has its own icon in the addon list, in the EverlookDB style (the database stack with a paw).
+- The addon has its own icon in the addon list.
 
 ## v0.4.0 (2026-11-20)
-- Settings window: switches, buttons and sliders use a softer shade of the accent colour, an on switch has a dark knob so it stands out, and boxes have cleaner rounded edges.
-- The window has a touch of colour: hunter green for the selected page, switches and sliders.
-- Bestiary: WoW Forever's own beasts now show where they spawn and their level when players have seen them (EG Link, our Collector); e.g. Low Plains Buzzard in Riverglades.
-
-- World map: on a continent or the world map, a small note next to the "Tameable beasts" switch says to open a zone's map, since the pins show on zone maps.
-- Renaming your pet keeps what Everlook Pets knew about it (what it was told about, what's new) instead of leaving an old entry behind under the old name. Old entries for pets you no longer have are cleared when you open the stable.
-- On characters that aren't hunters, Everlook Pets now stays idle: it no longer watches nameplates, targets and mouse-overs, and it puts no "Hunters only" plugin on your bars. The Bestiary (`/epets beasts`) still works on every character.
-- Lighter in combat: your pet's happiness, the pet bar and spell updates no longer make Everlook Pets re-check everything during a fight; it checks once when combat ends, and the world map's pins update then too.
-- Rare and wishlist alerts: the chat line has clickable [Waypoint] (to its nearest known spawn spot) and [Beast page] links instead of a "/tar Name" to retype. To target the beast, bind a key under Key Bindings > AddOns > Everlook Pets ("Target the beast from the last rare / wishlist alert"); the line then says which key. The sound is a soft ping now; the raid warning sound is a setting ("Use the raid warning sound instead").
-- Setting a waypoint no longer prints a chat line each time; the beast page says where it went, right under its buttons.
-- The minimap button is off by default when Everlook Bar is loaded, since its Everlook Pets plugin on the bar shows the same count. Turn it back on in Settings (or `/epets minimap on`); if you had switched it off, it stays off.
-- The minimap button no longer jumps around when a button drawer (Everlook Bar's, for one) has collected it.
+- Softer, cleaner settings window with a touch of hunter green.
+- Bestiary: WoW Forever's own beasts now show where they spawn and their level once players have seen them.
+- World map: a note next to the "Tameable beasts" switch says pins show on zone maps.
+- Renaming your pet keeps what the addon knew about it.
+- On non-hunters the addon stays idle; the Bestiary (`/epets beasts`) still works.
+- Lighter in combat: updates wait until the fight ends.
+- Rare and wishlist alerts have clickable [Waypoint] and [Beast page] links, and a key binding targets the beast. The sound is a soft ping now (raid warning sound is a setting).
+- Setting a waypoint no longer prints a chat line.
+- The minimap button is off by default when EverlookDB Bar is loaded, since the bar shows the same count, and no longer jumps around in button drawers.
 
 ## v0.3.0 (2026-11-19)
 
@@ -59,7 +53,7 @@
 - **Where?** now lists the beasts that teach the rank, from EverlookDB's bestiary: ones you can tame at your level first, confirmed before seen before classic data, in your zone and then your continent first, with their levels and zones and a link to the first one's EverlookDB page. It links the site's pet page only when no beast is known.
 - Wild beasts' tooltips say what they teach when tamed: "Teaches: Bite 2 · Claw 3", marked confirmed, seen in WoW Forever or classic data.
 - Abilities new in WoW Forever (Dismember, Pinch, Swipe...) become a normal "tame" to do once players have seen a beast teach them.
-- Where the bestiary comes from: hunters' tames in WoW Forever (EG Link by Efficient Games, Forever Hunter Pets, BeastScout) and the classic 1.12 client's data (VMaNGOS) where nobody has reported a beast yet. Credits in the Data and links page and the README.
+- The bestiary comes from hunters' tames in WoW Forever, with classic data where nobody has reported a beast yet. Credits are on the Data and links page.
 
 ## v0.1.0 (2026-11-18)
 

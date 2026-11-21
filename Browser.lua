@@ -572,10 +572,10 @@ local function beastPage(stack)
 		if #e.spots == 0 then return #e.zones > 0 and ("In " .. zoneNames(e) .. ". No spawn points known yet.") or "Where it lives isn't known yet." end
 		local old = 0
 		for _, s in ipairs(e.spots) do if B.OldSpot(s) then old = old + 1 end end
-		if old == 0 then return "Where WoW Forever players saw it (Forever Hunter Pets, EG Link, EverlookDB Collector)." end
-		if old == #e.spots then return "Older data only: classic-db's spawn points (Classic 1.12, GPL-3.0). WoW Forever may differ." end
-		return "Where WoW Forever players saw it first; the spots marked older data are classic-db's spawn points "
-			.. "(Classic 1.12, GPL-3.0) nobody has confirmed yet, and may be wrong."
+		if old == 0 then return "Where WoW Forever players saw it." end
+		if old == #e.spots then return "Older classic data only. WoW Forever may differ." end
+		return "Where WoW Forever players saw it first; spots marked older data are classic spawn points "
+			.. "nobody has confirmed yet, and may be wrong."
 	end)
 	Br.spotList = ns.Cards(stack, {
 		rowHeight = 44,
@@ -586,7 +586,7 @@ local function beastPage(stack)
 			return s.n == 1 and "Seen once by WoW Forever players" or ("Seen " .. s.n .. " times by WoW Forever players")
 		end,
 		tooltip = function(s)
-			if B.OldSpot(s) then return { "Older data", "A classic-db spawn point (Classic 1.12). WoW Forever players haven't seen this beast here yet, so it may be wrong." } end
+			if B.OldSpot(s) then return { "Older data", "A classic spawn point. WoW Forever players haven't seen this beast here yet, so it may be wrong." } end
 			return { "Seen in WoW Forever", "Players saw this beast here " .. (s.n == 1 and "once" or (s.n .. " times")) .. "." }
 		end,
 		buttons = { { label = "Waypoint", width = 90, onClick = function(s) if Br.current then Br.Waypoint(Br.current, s) end end } },

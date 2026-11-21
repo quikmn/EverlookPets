@@ -522,20 +522,14 @@ end)
 ------------------------------------------------------------------------
 app:Section("data", "Data and links", function(stack)
 	UI.Header(stack, "Where the data comes from")
-	UI.Note(stack, "Families, diets, abilities and the pet level each rank needs: EverlookDB's pet data, from the WoW Forever "
-		.. "game files (build " .. (ns.Data.build or "?") .. "). Tameable beasts: EverlookDB (the game's tameable flag, classic-db levels).")
-	UI.Note(stack, "Which beast teaches which rank: EverlookDB's bestiary. It comes from hunters' tames in WoW Forever (EG Link by "
-		.. "Efficient Games, Forever Hunter Pets, BeastScout) and, where nobody has reported a beast yet, classic data (VMaNGOS). "
-		.. "Each rank says how sure it is: |cff62cf88confirmed|r (two sources agree, or several tames), seen in WoW Forever "
-		.. "(one source), or |cff8d94a3classic data|r (WoW Forever may differ). The game files WoW Forever ships don't have it.")
-	UI.Note(stack, "Where beasts spawn: where WoW Forever players saw them (Forever Hunter Pets, MIT; EG Link, CC BY 4.0; "
-		.. "EverlookDB Collector), first; classic-db's spawn points (Classic 1.12, GPL-3.0) only where nobody has seen them, "
-		.. "marked older data. Models, names, levels and rare or elite: the game's data on EverlookDB. Training "
-		.. "point costs: Beast Training as Forever Hunter Pets (MIT) and EG Link players (CC BY 4.0) read it. Tamed by you "
-		.. "and your wishlist stay on your computer, per character.")
-	UI.Note(stack, "The level-up card: what hunter trainers teach at each level, and where hunter and pet trainers stand, from "
-		.. "classic-db (CMaNGOS, GPL-3.0) on EverlookDB, with spots WoW Forever players saw (EG Link) first; spell names and "
-		.. "icons from the WoW Forever game files.")
+	UI.Note(stack, "Families, abilities, ranks and spell names come from WoW Forever itself. Which beast teaches which rank "
+		.. "and where beasts spawn come from EverlookDB: what hunters tamed and saw in WoW Forever, with older classic "
+		.. "data where nobody has reported a beast yet.")
+	UI.Note(stack, "Each rank says how sure it is: |cff62cf88confirmed|r (two sources agree, or several tames), seen in WoW "
+		.. "Forever (one source), or |cff8d94a3classic data|r (WoW Forever may differ). Tamed by you and your wishlist stay "
+		.. "on your computer, per character.")
+	UI.Note(stack, "Credits: classic-db (CMaNGOS, GPL-3.0), EG Link (Efficient Games, CC BY 4.0), Forever Hunter Pets (MIT), "
+		.. "BeastScout (GPL-3.0), VMaNGOS (GPL-2.0-or-later).")
 	UI.CopyBox(stack, "EverlookDB pets", function() return siteURL() end)
 end)
 
