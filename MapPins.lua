@@ -58,6 +58,9 @@ function MP.TooltipLines(info)
 		lines[#lines + 1] = "|cffffd200" .. ((ab and ns.AbilityName(ab)) or t.key) .. " " .. t.rank .. "|r  |cff8d94a3"
 			.. (ns.Logic.STATE_LABEL[t.state] or t.state) .. "|r"
 	end
+	if B.OldSpot(info.spot) then
+		lines[#lines + 1] = "|cff8d94a3Older data (classic spawn points): WoW Forever players haven't seen it here yet, so it may be wrong.|r"
+	end
 	lines[#lines + 1] = "|cff8d94a3Your pet lacks these ranks. Click for its page in " .. ns.SLASH .. ".|r"
 	return lines
 end

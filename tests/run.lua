@@ -213,12 +213,12 @@ local BD = {
 		[1] = { 2, 9, 10 }, [2] = { 2, 30, 31 }, [3] = { 1, 12, 13 }, [4] = { 2, 37, 37 }, [5] = { 1, 1, 2 }, [6] = { 2, 14, 15 },
 	},
 	wild = {
-		[1] = { "Prowler", 0, 100, 1, { { 10, 450, 500, 470, 520 } } },
-		[2] = { "Stranglethorn Tiger", 0, 101, 0, { { 11, 300, 140 } } },
-		[3] = { "Gray Wolf", 0, 102, 0, { { 20, 400, 400 } } },
-		[4] = { "Broken Tooth", 2, 103, 0, { { 11, 500, 500 } } },
+		[1] = { "Prowler", 0, 100, 1, { { 10, 450, 500, 2, 470, 520, 2 } } },
+		[2] = { "Stranglethorn Tiger", 0, 101, 0, { { 11, 300, 140, 0 } } },
+		[3] = { "Gray Wolf", 0, 102, 0, { { 20, 400, 400, 0 } } },
+		[4] = { "Broken Tooth", 2, 103, 0, { { 11, 500, 500, 0 } } },
 		[5] = { "Raptor", 0, 104, 0, {} },                     -- nothing known: hidden until searched
-		[6] = { "Elwynn Cat", 0, 105, 0, { { 10, 100, 100 } } },
+		[6] = { "Elwynn Cat", 0, 105, 0, { { 10, 100, 100, 0 } } },
 	},
 	beasts = {
 		[1] = { 9, 10, 10, "Prowler", { 102, 3, 502, 2 }, 1.5 },
@@ -253,8 +253,8 @@ step("bestiary: a level nobody reported goes last; known teachers first among th
 	D2.tameable, D2.wild = {}, {}
 	for k, v in pairs(BD.tameable) do D2.tameable[k] = v end
 	for k, v in pairs(BD.wild) do D2.wild[k] = v end
-	D2.tameable[7] = { 1, 0, 0 }; D2.wild[7] = { "Galestrider", 0, 0, 1, { { 10, 500, 500 } } } -- no level known
-	D2.tameable[8] = { 2, 9, 10 }; D2.wild[8] = { "Aaa Lynx", 0, 0, 0, { { 10, 200, 200 } } } -- level 9, teaches nothing known
+	D2.tameable[7] = { 1, 0, 0 }; D2.wild[7] = { "Galestrider", 0, 0, 1, { { 10, 500, 500, 1 } } } -- no level known
+	D2.tameable[8] = { 2, 9, 10 }; D2.wild[8] = { "Aaa Lynx", 0, 0, 0, { { 10, 200, 200, 0 } } } -- level 9, teaches nothing known
 	local list = Bst.Entries(D2)
 	eq(list[#list].name, "Galestrider", "level ? last")
 	eq(Bst.Levels(list[#list]), "?")
@@ -381,6 +381,42 @@ MOCK.pet = { name = "Rufus", family = "Cat", familyId = 2, level = 10, knows = s
 local function row(key)
 	for _, r in ipairs(ns.state.result.rows) do if r.key == key then return r end end
 end
+
+step("waypoint spot: player-seen beats classic-db, lone sightings skipped, classic only says older data", function()
+	local D3 = { families = BD.families, abilities = BD.abilities, zones = BD.zones, beasts = {}, teachers = {},
+		tameable = { [1] = { 2, 9, 10 }, [2] = { 2, 9, 10 }, [3] = { 2, 9, 10 } },
+		wild = {
+			-- seen 5 times at 70/60, once at 78/15; classic-db says 38/74 and 45/47
+			[1] = { "Lasher", 0, 0, 1, { { 10, 700, 600, 5, 780, 150, 1, 380, 740, 0, 450, 470, 0 } } },
+			-- classic-db only
+			[2] = { "Old Cat", 0, 0, 0, { { 10, 300, 300, 0, 600, 600, 0 } } },
+			-- player-seen only in Stranglethorn, classic-db in Elwynn
+			[3] = { "Wanderer", 0, 0, 1, { { 11, 500, 500, 3 }, { 10, 200, 200, 0 } } },
+		},
+	}
+	local lasher = Bst.Get(D3, 1)
+	eq(#lasher.spots, 4); eq(lasher.spots[1].n, 5); check(Bst.OldSpot(lasher.spots[3]), "n 0 is older data")
+	-- from anywhere on the map: the player-seen spot, even standing on a classic-db one or next to the lone sighting
+	for _, p in ipairs({ { 0.38, 0.74 }, { 0.45, 0.47 }, { 0.78, 0.16 }, { 0.1, 0.9 }, { 0.7, 0.6 } }) do
+		local s = Bst.BestSpot(D3, lasher, { map = 10, x = p[1], y = p[2], continent = 1 })
+		check(s.x == 0.7 and s.y == 0.6, ("from %.2f, %.2f: got %.2f, %.2f"):format(p[1], p[2], s.x, s.y))
+	end
+	-- no position: the most seen
+	eq(Bst.BestSpot(D3, lasher, { map = 10 }).n, 5)
+	-- classic-db only: still a spot, the nearest
+	local old = Bst.BestSpot(D3, Bst.Get(D3, 2), { map = 10, x = 0.55, y = 0.55 })
+	check(old and old.x == 0.6 and Bst.OldSpot(old), "classic-db spot")
+	-- player-seen on your continent beats classic-db on your map
+	local w = Bst.BestSpot(D3, Bst.Get(D3, 3), { map = 10, x = 0.2, y = 0.2, continent = 1 })
+	eq(w.map, 11, "player-seen in Stranglethorn first")
+	-- on another continent: player-seen anywhere first
+	eq(Bst.BestSpot(D3, Bst.Get(D3, 3), { map = 20, x = 0.5, y = 0.5, continent = 2 }).map, 11)
+	-- the waypoint line says when it is older data
+	local _, spot, text = ns.Browser.Waypoint(Bst.Get(D3, 2), old)
+	check(spot == old and text:find("Older data", 1, true), text)
+	_, _, text = ns.Browser.Waypoint(lasher, lasher.spots[1])
+	check(not text:find("Older data", 1, true), text)
+end)
 
 step("data: generated file is sane", function()
 	local D = ns.Data
@@ -674,6 +710,52 @@ step("beast page: facts, what it teaches with costs, waypoints (the game's and T
 	ns.app:ShowSection("bestiary")
 	eq(ns.app.current, "bestiary")
 	check(not ns.Browser.OpenBeast(999999), "unknown beast")
+end)
+
+step("real data: waypoints go where WoW Forever players see a beast; classic-db only as older data", function()
+	local D, Br = ns.Data, ns.Browser
+	-- Scorpashi Lasher (Desolace): players see it around 70/59; classic-db's 37/74 and 45/47 come after
+	local lasher = Bst.Get(D, 4697)
+	check(lasher and #lasher.spots > 0, "Scorpashi Lasher has spots")
+	check(not Bst.OldSpot(lasher.spots[1]), "player-seen spot first")
+	local cont = Bst.Continent(D, 1443)
+	for x = 0.05, 0.96, 0.1 do
+		for y = 0.05, 0.96, 0.1 do
+			local s = Bst.BestSpot(D, lasher, { map = 1443, x = x, y = y, continent = cont })
+			check(s.map == 1443 and math.abs(s.x - 0.70) <= 0.04 and math.abs(s.y - 0.59) <= 0.04 and not Bst.OldSpot(s),
+				("from %.2f, %.2f: %d %.3f, %.3f"):format(x, y, s.map, s.x, s.y))
+		end
+	end
+	-- from elsewhere on Kalimdor and from another continent: still Desolace's player-seen spot
+	local s = Bst.BestSpot(D, lasher, { map = 1413, x = 0.5, y = 0.5, continent = cont })
+	check(s.map == 1443 and not Bst.OldSpot(s), "from the Barrens")
+	s = Bst.BestSpot(D, lasher, { map = 1429, x = 0.5, y = 0.5, continent = Bst.Continent(D, 1429) })
+	check(s.map == 1443 and not Bst.OldSpot(s), "from Elwynn")
+	-- the waypoint line from Desolace (the game says where you are)
+	local realMap, realPos = C_Map.GetBestMapForUnit, MOCK.pos
+	C_Map.GetBestMapForUnit = function() return 1443 end
+	MOCK.pos = { 0.40, 0.73 }
+	local _, spot, text = Br.Waypoint(lasher)
+	C_Map.GetBestMapForUnit, MOCK.pos = realMap, realPos
+	check(spot and math.abs(spot.x - 0.70) <= 0.04, "waypoint near 70/59: " .. tostring(text))
+	check(not text:find("Older data", 1, true), text)
+	-- every beast: on a map with player-seen spots the waypoint never picks a classic-db one; a beast with only
+	-- classic-db spots still gets one, and its line says it is older data
+	local oldOnly
+	for _, e in ipairs((Bst.Entries(D))) do
+		local seenOn = {}
+		for _, p in ipairs(e.spots) do if not Bst.OldSpot(p) then seenOn[p.map] = true end end
+		for _, p in ipairs(e.spots) do
+			local b = Bst.BestSpot(D, e, { map = p.map, x = p.x, y = p.y, continent = Bst.Continent(D, p.map) })
+			check(b, e.name .. ": a spot")
+			if seenOn[p.map] then check(not Bst.OldSpot(b), e.name .. ": player-seen first on " .. p.map) end
+		end
+		if #e.spots > 0 and not next(seenOn) and not oldOnly then oldOnly = e end
+	end
+	check(oldOnly, "a beast with classic-db spots only")
+	_, spot, text = Br.Waypoint(oldOnly)
+	check(spot and Bst.OldSpot(spot), oldOnly.name .. ": classic-db spot")
+	check(text:find("Older data", 1, true), text)
 end)
 
 step("your pet page: still to learn, most worth it first, with beasts and training points", function()

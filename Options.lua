@@ -369,8 +369,9 @@ app:Section("data", "Data and links", function(stack)
 		.. "Efficient Games, Forever Hunter Pets, BeastScout) and, where nobody has reported a beast yet, classic data (VMaNGOS). "
 		.. "Each rank says how sure it is: |cff62cf88confirmed|r (two sources agree, or several tames), seen in WoW Forever "
 		.. "(one source), or |cff8d94a3classic data|r (WoW Forever may differ). The game files WoW Forever ships don't have it.")
-	UI.Note(stack, "Where beasts spawn: where WoW Forever players found them (Forever Hunter Pets, MIT), else classic-db's "
-		.. "spawn points (Classic 1.12, GPL-3.0). Models, names, levels and rare or elite: the game's data on EverlookDB. Training "
+	UI.Note(stack, "Where beasts spawn: where WoW Forever players saw them (Forever Hunter Pets, MIT; EG Link, CC BY 4.0; "
+		.. "EverlookDB Collector), first; classic-db's spawn points (Classic 1.12, GPL-3.0) only where nobody has seen them, "
+		.. "marked older data. Models, names, levels and rare or elite: the game's data on EverlookDB. Training "
 		.. "point costs: Beast Training as Forever Hunter Pets (MIT) and EG Link players (CC BY 4.0) read it. Tamed by you "
 		.. "and your wishlist stay on your computer, per character.")
 	UI.Note(stack, "The level-up card: what hunter trainers teach at each level, and where hunter and pet trainers stand, from "

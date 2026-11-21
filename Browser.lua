@@ -168,9 +168,11 @@ function Br.OpenSearch(text)
 	app:Open("bestiary")
 end
 
--- A waypoint to the beast's best spot (nearest on your map, else on your continent). Returns what was set ("tomtom",
--- "game" or nil), the spot and a line saying so. No chat line: the beast page shows the line under its buttons
+-- A waypoint to the beast's best spot (B.BestSpot: where WoW Forever players saw it, nearest on your map, else on your
+-- continent; classic-db's older spawn data only when players haven't seen it there). Returns what was set ("tomtom",
+-- "game" or nil), the spot and a line saying so (and that it is older data, when it is). No chat line: the beast page shows the line under its buttons
 -- (Br.waypointNote), and the waypoint itself shows on the map and the screen.
+Br.OLD_SPOT = "Older data (classic spawn points): WoW Forever players haven't seen it there yet, so it may be wrong."
 function Br.Waypoint(e, spot)
 	spot = spot or B.BestSpot(ns.Data, e, ns.Here())
 	local text
@@ -185,6 +187,7 @@ function Br.Waypoint(e, spot)
 	if how == "tomtom" then text = "TomTom waypoint: " .. e.name .. ", " .. where .. "."
 	elseif how == "game" then text = "Waypoint: " .. e.name .. ", " .. where .. " (on your map and screen)."
 	else text = "This map takes no waypoint. " .. e.name .. ": " .. where .. "." end
+	if B.OldSpot(spot) then text = text .. " " .. Br.OLD_SPOT end
 	Br.waypointNote = { id = e.id, text = text, ok = how ~= nil }
 	if app and app:IsShown() then app:Refresh() end
 	return how, spot, text
@@ -567,13 +570,25 @@ local function beastPage(stack)
 		local e = Br.current
 		if not e then return "" end
 		if #e.spots == 0 then return #e.zones > 0 and ("In " .. zoneNames(e) .. ". No spawn points known yet.") or "Where it lives isn't known yet." end
-		return e.spotsFrom == 1 and "Where WoW Forever players found it (Forever Hunter Pets, MIT)."
-			or "Spawn points from classic-db (Classic 1.12, GPL-3.0); WoW Forever may differ."
+		local old = 0
+		for _, s in ipairs(e.spots) do if B.OldSpot(s) then old = old + 1 end end
+		if old == 0 then return "Where WoW Forever players saw it (Forever Hunter Pets, EG Link, EverlookDB Collector)." end
+		if old == #e.spots then return "Older data only: classic-db's spawn points (Classic 1.12, GPL-3.0). WoW Forever may differ." end
+		return "Where WoW Forever players saw it first; the spots marked older data are classic-db's spawn points "
+			.. "(Classic 1.12, GPL-3.0) nobody has confirmed yet, and may be wrong."
 	end)
 	Br.spotList = ns.Cards(stack, {
-		rowHeight = 36,
+		rowHeight = 44,
 		items = function() return Br.current and Br.current.spots or {} end,
 		title = function(s) return ("%s  %s%.1f, %.1f|r"):format(B.ZoneName(ns.Data, s.map, ns.MapName), MUTED, s.x * 100, s.y * 100) end,
+		sub = function(s)
+			if B.OldSpot(s) then return MUTED .. "Older data (classic spawn points), may be wrong|r" end
+			return s.n == 1 and "Seen once by WoW Forever players" or ("Seen " .. s.n .. " times by WoW Forever players")
+		end,
+		tooltip = function(s)
+			if B.OldSpot(s) then return { "Older data", "A classic-db spawn point (Classic 1.12). WoW Forever players haven't seen this beast here yet, so it may be wrong." } end
+			return { "Seen in WoW Forever", "Players saw this beast here " .. (s.n == 1 and "once" or (s.n .. " times")) .. "." }
+		end,
 		buttons = { { label = "Waypoint", width = 90, onClick = function(s) if Br.current then Br.Waypoint(Br.current, s) end end } },
 		empty = "",
 	})

@@ -19,9 +19,12 @@ What it reads:
     (two sources agree or several tames), 2 seen (one WoW Forever source), 1 classic. We keep per beast its levels,
     main zone, English name, ranks with state and attack speed, and per rank its beasts best first; nothing else, so
     Data.lua stays small. Without the file the addon falls back to the site link.
-  * For the bestiary browser (D.wild): where each tameable beast spawns, from Forever Hunter Pets' coordinates (MIT,
-    seen in WoW Forever) or else classic-db's spawn points (Quarry's web/data/classicdb.json, GPL-3.0), merged into a
-    few spots per zone. Zone names and continents: the WoW Forever client's UiMap table (ForeverMiner's
+  * For the bestiary browser (D.wild): where each tameable beast spawns. Seen in WoW Forever first: Forever Hunter
+    Pets' coordinates (MIT), EG Link's (CC BY 4.0) and our Collector's (the site's /api/v1/crowd/map/{id} per zone,
+    cached a day in tools/.cache), weighted by how often players saw it there. classic-db's spawn points (Quarry's
+    web/data/classicdb.json, GPL-3.0) only as secondary, marked older data: dropped where players see the beast anyway,
+    and dropped as contradicted where players saw it often in that zone and never near that point (see DENSE).
+    Merged into a few spots per zone, each one a real source point (check_spots). Zone names and continents: the WoW Forever client's UiMap table (ForeverMiner's
     out/tables/UiMap.csv) and the bestiary's zone list.
   * Training points per ability rank (D.training): Forever Hunter Pets' Beast Training readings (MIT), else the highest
     cost EG Link players' Beast Training showed (CC BY 4.0).
@@ -32,6 +35,8 @@ import json
 import re
 import sqlite3
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date
@@ -112,34 +117,6 @@ def continent_of(maps: dict, m: int) -> int:
     return 0
 
 
-def spots(points: list, cell: float = 4.0, per_zone: int = 3, most: int = 6) -> list:
-    """[[map, x, y], ...] (percent) -> [(map, [(x10, y10), ...]), ...]: points merged into cells of `cell` percent,
-    the busiest cells first, at most `per_zone` per zone and `most` in all; x and y in tenths of a percent."""
-    cells = {}
-    for p in points:
-        if not isinstance(p, list) or len(p) < 3:
-            continue
-        m, x, y = int(p[0]), float(p[1]), float(p[2])
-        if not (0 <= x <= 100 and 0 <= y <= 100):
-            continue
-        c = cells.setdefault((m, int(x // cell), int(y // cell)), [0, 0.0, 0.0])
-        c[0] += 1
-        c[1] += x
-        c[2] += y
-    zones = {}
-    for (m, _, _), (n, sx, sy) in sorted(cells.items(), key=lambda kv: (-kv[1][0], kv[0])):
-        zones.setdefault(m, []).append((n, round(sx / n * 10), round(sy / n * 10)))
-    order = sorted(zones, key=lambda m: (-sum(c[0] for c in zones[m]), m))
-    out, left = [], most
-    for m in order:
-        if left <= 0:
-            break
-        keep = zones[m][:min(per_zone, left)]
-        left -= len(keep)
-        out.append((m, [(x, y) for _, x, y in keep]))
-    return out
-
-
 def collector_npc(npc: int, offline: bool) -> dict:
     """What players' EverlookDB Collector uploads saw of one creature (levels, positions), {} when nothing yet."""
     if offline:
@@ -153,17 +130,127 @@ def collector_npc(npc: int, offline: bool) -> dict:
         return {}
 
 
-def collector_points(c: dict) -> list:
-    """Collector positions ({map, cells: [[x, y, n], ...]} in tenths of a percent) -> [[map, x, y], ...] percent."""
-    return [[p["map"], x / 10, y / 10] for p in c.get("positions") or [] for x, y, *_ in p.get("cells") or []]
+# Spots. Every spot we write is one of the source's own points (the densest point's neighbourhood, snapped to the
+# member nearest its weighted centre), never an average of points in different places, so a waypoint always lands
+# where a beast was seen or spawns. Player-seen spots (WoW Forever) carry how often they were seen; classic-db spots
+# carry 0 ("older data, may be wrong").
+RADIUS = 3.0        # percent of the map: points this close form one spot
+NEAR = 6.0          # a classic-db spot this close to a player-seen point adds nothing (players see it there): dropped
+DENSE = 20          # sightings of a beast in a zone from which player data overrules classic-db there: a classic-db spot
+                    # farther than NEAR from every player-seen point in such a zone is contradicted and dropped. Below
+                    # it the classic-db spot stays as secondary data: thin player data says little about where a beast
+                    # isn't (Scorpashi Lasher: 8 sightings, all in the east, and its south-central camp is real).
+PER_ZONE = 3        # player-seen spots per zone, and classic-db spots per zone
+MOST = 8            # spots per beast in all (player-seen ones take the room first)
 
 
-def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, offline: bool = False) -> list:
+def clusters(points: list, r: float = RADIUS) -> list:
+    """[(x, y, weight), ...] percent on one map -> [(weight, x, y), ...] heaviest first; x, y one of the points."""
+    pts = [p for p in points if 0 <= p[0] <= 100 and 0 <= p[1] <= 100 and p[2] > 0]
+    r2 = r * r
+    near = [[j for j, q in enumerate(pts) if (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 <= r2] for p in pts]
+    dens = [sum(pts[j][2] for j in nb) for nb in near]
+    taken, out = set(), []
+    for i in sorted(range(len(pts)), key=lambda i: (-dens[i], -pts[i][2], pts[i][0], pts[i][1])):
+        if i in taken:
+            continue
+        members = [j for j in near[i] if j not in taken]
+        taken.update(members)
+        w = sum(pts[j][2] for j in members)
+        cx = sum(pts[j][0] * pts[j][2] for j in members) / w
+        cy = sum(pts[j][1] * pts[j][2] for j in members) / w
+        s = min(members, key=lambda j: ((pts[j][0] - cx) ** 2 + (pts[j][1] - cy) ** 2, j))
+        out.append((w, pts[s][0], pts[s][1]))
+    out.sort(key=lambda c: (-c[0], c[1], c[2]))
+    return out
+
+
+def by_map(points: list) -> dict:
+    """[[map, x, y(, weight)], ...] -> {map: [(x, y, weight), ...]}."""
+    out = {}
+    for p in points:
+        w = p[3] if len(p) > 3 else 1
+        out.setdefault(int(p[0]), []).append((float(p[1]), float(p[2]), w))
+    return out
+
+
+def beast_spots(player: list, classic: list, stats: dict) -> list:
+    """Player-seen and classic-db points ([[map, x, y(, weight)], ...] percent) -> [(map, [(x10, y10, n), ...])]
+    with n the sightings of a player-seen spot and 0 for a classic-db one; zones with player data first."""
+    P, C = by_map(player), by_map(classic)
+    zones = {}
+    for m in set(P) | set(C):
+        pp = P.get(m, [])
+        seen = sum(w for _, _, w in pp)
+        ps = clusters(pp)[:PER_ZONE]
+        cs = []
+        for _, x, y in clusters(C.get(m, [])):
+            if any((x - a) ** 2 + (y - b) ** 2 <= NEAR * NEAR for a, b, _ in pp):
+                continue
+            if seen >= DENSE:
+                stats["contradicted"].add(stats["npc"])
+                stats["dropped"] += 1
+                continue
+            if pp:
+                stats["unconfirmed"].add(stats["npc"])
+            cs.append((0, x, y))
+        zones[m] = (seen, ps, cs[:PER_ZONE])
+    order = sorted(zones, key=lambda m: (-zones[m][0], -len(zones[m][2]), m))
+    keep, left = {}, MOST
+    for part in (1, 2):
+        for m in order:
+            take = zones[m][part][:max(left, 0)]
+            left -= len(take)
+            keep.setdefault(m, []).extend(take)
+    return [(m, [(round(x * 10), round(y * 10), min(int(w), 999)) for w, x, y in keep[m]]) for m in order if keep[m]]
+
+
+def crowd_positions(maps: dict, offline: bool) -> dict:
+    """npc id -> [[map, x, y, sightings], ...] percent: where players' EverlookDB Collector uploads saw each creature
+    in WoW Forever, from the site's per-zone dump (/api/v1/crowd/map/{id}: every NPC seen on that map with its cells,
+    x and y in tenths of a percent). One request per zone map, about 5 a second, Retry-After honoured; cached for a
+    day in tools/.cache/crowd-maps.json (and used as it is when offline or the site can't be reached)."""
+    cache = ROOT / "tools" / ".cache" / "crowd-maps.json"
+    old = load_json(cache) if cache.exists() else {}
+    if offline or old.get("date") == date.today().isoformat():
+        data = old.get("maps", {})
+    else:
+        base, data = API.split("/api/")[0], {}
+        for mid in sorted(m for m, (_, _, typ) in maps.items() if typ >= 3):
+            for _ in range(4):
+                req = urllib.request.Request(f"{base}/api/v1/crowd/map/{mid}", headers={"User-Agent": "everlookpets-gen-data"})
+                try:
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        data[str(mid)] = [[n["id"], n["cells"]] for n in json.load(r).get("npcs", [])]
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code != 429:
+                        break
+                    time.sleep(min(float(e.headers.get("Retry-After") or 10), 120))
+                except Exception:  # noqa: BLE001 - network trouble: keep what the cache had for this map
+                    if str(mid) in old.get("maps", {}):
+                        data[str(mid)] = old["maps"][str(mid)]
+                    break
+            time.sleep(0.2)
+        if data:
+            cache.parent.mkdir(exist_ok=True)
+            cache.write_text(json.dumps({"date": date.today().isoformat(), "maps": data}), encoding="utf-8")
+        else:
+            data = old.get("maps", {})
+    out = {}
+    for mid, npcs in data.items():
+        for npc, cells in npcs:
+            out.setdefault(int(npc), []).extend([int(mid), x / 10, y / 10, n] for x, y, n in cells)
+    return out
+
+
+def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, stats: dict, offline: bool = False) -> list:
     """D.wild lines: per tameable beast its English name, rank, model and where it spawns."""
     classic = load_json(data_dir / "classicdb.json").get("npcs", {})
     jazz = load_json(data_dir / "jazzman.json").get("beasts", {})
-    # where EG Link players met each creature in WoW Forever (CC BY 4.0): the only spots for WoW Forever's new beasts
+    # where EG Link players met each creature in WoW Forever (CC BY 4.0)
     eg = load_json(data_dir / "eglink.json").get("npcs", {})
+    crowd = crowd_positions(maps, offline)
     by_name = {}
     for mid, (name, _, typ) in sorted(maps.items()):
         if typ in (3, 4, 5) and name not in by_name:
@@ -181,24 +268,22 @@ def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, off
         if npc not in info:
             name = c.get("name", "")
             rank = {1: 1, 2: 3, 4: 2}.get(c.get("rank", 0), 0)
-        jz = jazz.get(str(npc), {})
-        src, groups = 0, []
-        jz_at, eg_at, c_at = (zone_points(x.get("at") or []) for x in (jz, eg.get(str(npc), {}), c))
-        if jz_at:
-            src, groups = 1, spots(jz_at)
-        elif eg_at:
-            src, groups = 1, spots(eg_at)
-        elif c_at:
-            groups = spots(c_at)
-        if not groups:
-            # last: where our own Collector's players saw it (WoW Forever)
-            pts = zone_points(collector_points(collector_npc(npc, offline)))
-            if pts:
-                src, groups = 1, spots(pts)
+        # seen in WoW Forever: Forever Hunter Pets (MIT), EG Link (CC BY 4.0) and our Collector, all together
+        player = zone_points((jazz.get(str(npc), {}).get("at") or []) + (eg.get(str(npc), {}).get("at") or [])
+                             + crowd.get(npc, []))
+        old = zone_points(c.get("at") or [])
+        stats["npc"] = npc
+        stats["raw"][npc] = (player, old)
+        groups = beast_spots(player, old, stats)
+        src = 1 if any(n for _, pts in groups for _, _, n in pts) else 0
+        if src:
+            stats["player"] += 1
+        elif groups:
+            stats["classic_only"] += 1
         places = []
         for m, pts in groups:
             used.add(m)
-            places.append("{ " + ", ".join([str(m)] + [f"{x}, {y}" for x, y in pts]) + " }")
+            places.append("{ " + ", ".join([str(m)] + [f"{x}, {y}, {n}" for x, y, n in pts]) + " }")
         if not places and zone:
             if zone in by_name:
                 used.add(by_name[zone])
@@ -207,6 +292,22 @@ def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, off
                 places.append(f"{{ {lua_str(zone)} }}")
         rows.append(f"\t[{npc}] = {{ {lua_str(name)}, {rank}, {display}, {src}, {{ {', '.join(places)} }} }},")
     return rows
+
+
+def check_spots(rows: list, stats: dict) -> int:
+    """Every written spot must be one of its beast's raw source points (within rounding): no spot in between."""
+    bad = 0
+    for line in rows:
+        npc = int(re.match(r"\t\[(\d+)\]", line)[1])
+        raw = by_map(stats["raw"][npc][0] + stats["raw"][npc][1])
+        for g in re.findall(r"\{ (\d+(?:, \d+)+) \}", line):
+            v = [int(x) for x in g.split(", ")]
+            for i in range(1, len(v) - 2, 3):
+                x, y = v[i] / 10, v[i + 1] / 10
+                if not any(abs(x - a) <= 0.06 and abs(y - b) <= 0.06 for a, b, _ in raw.get(v[0], [])):
+                    bad += 1
+                    print(f"spot {v[0]} {x},{y} of {npc} is no source point", file=sys.stderr)
+    return bad
 
 
 def training_costs(data_dir: Path) -> dict:
@@ -299,7 +400,12 @@ def main() -> int:
                 tame[npc] = (fam, l[0], l[1] if len(l) > 1 and l[1] else l[0])
     maps = uimaps(Path(a.uimap))
     used = set()
-    wild = wild_rows(tame, info, data_dir, maps, used, a.offline)
+    stats = {"contradicted": set(), "unconfirmed": set(), "dropped": 0, "player": 0, "classic_only": 0, "raw": {}}
+    wild = wild_rows(tame, info, data_dir, maps, used, stats, a.offline)
+    bad = check_spots(wild, stats)
+    if bad:
+        print(f"{bad} spots aren't any source's point: not writing Data.lua", file=sys.stderr)
+        return 1
     costs = training_costs(data_dir)
 
     L = []
@@ -339,9 +445,10 @@ def main() -> int:
     w("}")
     nb = write_bestiary(w, best, maps, used)
     w("-- The bestiary browser: npc id = { English name, rank (0 normal, 1 elite, 2 rare, 3 rare elite), display id")
-    w("-- (0 unknown), spots from (1 WoW Forever players: Forever Hunter Pets, MIT, EG Link, CC BY 4.0, or our Collector; 0 classic-db, GPL-3.0),")
-    w("-- { { uiMap, x, y, x, y... }, ... } } with x and y in tenths of a percent of that map. A zone without spots is")
-    w("-- { uiMap } or { \"name\" } (an instance).")
+    w("-- (0 unknown), 1 when WoW Forever players saw it somewhere (Forever Hunter Pets, MIT; EG Link, CC BY 4.0; our")
+    w("-- Collector) else 0, { { uiMap, x, y, n, x, y, n... }, ... } } with x and y in tenths of a percent of that map and")
+    w("-- n how often players saw it there, or 0 for a classic-db spawn point (GPL-3.0; older data, may be wrong). Player-")
+    w("-- seen spots come first. A zone without spots is { uiMap } or { \"name\" } (an instance).")
     w("D.wild = {")
     for r in wild:
         w(r)
@@ -356,6 +463,10 @@ def main() -> int:
     print(f"wrote {OUT}: {len(pets['families'])} families, {len(pets['abilities'])} abilities, "
           f"{len(tame)} tameable beasts ({source}), {nb} beasts in the bestiary, {len(wild)} in the browser, "
           f"{len(costs)} training costs; {OUT.stat().st_size // 1024} KB")
+    print(f"spots: {stats['player']} beasts with player-seen spots, {stats['classic_only']} with classic-db spots only; "
+          f"{len(stats['contradicted'])} beasts had classic-db spots contradicted by dense player data "
+          f"({stats['dropped']} spots dropped), {len(stats['unconfirmed'])} keep classic-db spots players haven't "
+          f"confirmed (thin data, marked older)")
     return 0
 
 

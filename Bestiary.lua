@@ -26,7 +26,9 @@ B.FAST = 2.0 -- an attack speed below this is "fast attack" (2.0 s is a pet with
 ------------------------------------------------------------------------
 local cache
 -- One entry per tameable beast: { id, name, family, famKey, lo, hi, rank (0-3), rare, elite, display, zones (uiMap ids
--- or names), spots ({ map, x, y } with x and y 0-1), spotsFrom (1 WoW Forever players, 0 classic-db), teaches
+-- or names), spots ({ map, x, y, n } with x and y 0-1 and n how often WoW Forever players saw it there, 0 for a
+-- classic-db spawn point: older data, may be wrong; player-seen ones first), spotsFrom (1 WoW Forever players saw it
+-- somewhere, 0 classic-db only), teaches
 -- (L.BeastTeaches), speed (seconds, 0 unknown), known (we know where it is or what it teaches) }.
 function B.Entries(D)
 	if cache and cache.D == D then return cache.list, cache.by end
@@ -43,7 +45,9 @@ function B.Entries(D)
 				spotsFrom = w and w[4] or 0, zones = {}, spots = {}, speed = b and b[6] or 0 }
 			for _, g in ipairs(w and w[5] or {}) do
 				e.zones[#e.zones + 1] = g[1]
-				for i = 2, #g - 1, 2 do e.spots[#e.spots + 1] = { map = g[1], x = g[i] / 1000, y = g[i + 1] / 1000 } end
+				for i = 2, #g - 2, 3 do
+					e.spots[#e.spots + 1] = { map = g[1], x = g[i] / 1000, y = g[i + 1] / 1000, n = g[i + 2] or 0 }
+				end
 			end
 			if #e.zones == 0 and b and b[3] and b[3] ~= 0 then e.zones[1] = b[3] end
 			e.teaches = L.BeastTeaches(D, id) or {}
@@ -347,20 +351,48 @@ function B.PinsOn(D, map, missing, level)
 	return out
 end
 
--- The spot to send you to: on your map the nearest one, else one on your continent, else the first.
--- where = { map, x, y, continent }.
-function B.BestSpot(D, e, where)
-	where = where or {}
+-- A spot from classic-db (no WoW Forever player has seen the beast there): older data, may be wrong.
+function B.OldSpot(s) return s ~= nil and (s.n or 0) == 0 end
+
+-- The best of `spots` (all on one map, or all without your position): a lone sighting (seen once) is an outlier
+-- as long as a spot seen more often is in the same zone, so it is skipped then; of the rest the nearest to (x, y),
+-- or without a position the most seen.
+local function pick(spots, x, y)
+	local dense = false
+	for _, s in ipairs(spots) do if (s.n or 0) > 1 then dense = true end end
 	local best, bestD
-	for _, s in ipairs(e.spots) do
-		if s.map == where.map and where.x then
-			local d = (s.x - where.x) ^ 2 + (s.y - where.y) ^ 2
+	for _, s in ipairs(spots) do
+		if not (dense and s.n == 1) then
+			local d = x and ((s.x - x) ^ 2 + (s.y - y) ^ 2) or -(s.n or 0)
 			if not bestD or d < bestD then best, bestD = s, d end
 		end
 	end
-	if best then return best end
-	for _, s in ipairs(e.spots) do
-		if where.continent and B.Continent(D, s.map) == where.continent then return s end
+	return best
+end
+
+-- The spot to send you to: where WoW Forever players saw the beast before classic-db's older data. The best
+-- player-seen spot on your map (pick), else on your continent; only then classic-db's on your map or continent; then
+-- anywhere, player-seen first. where = { map, x, y, continent }.
+function B.BestSpot(D, e, where)
+	where = where or {}
+	local function among(test, old)
+		local out = {}
+		for _, s in ipairs(e.spots) do
+			if B.OldSpot(s) == old and test(s) then out[#out + 1] = s end
+		end
+		return out
 	end
-	return e.spots[1]
+	local onMap = function(s) return where.map ~= nil and s.map == where.map end
+	local onContinent = function(s) return where.continent ~= nil and B.Continent(D, s.map) == where.continent end
+	local anywhere = function() return true end
+	-- player-seen on your map, then on your continent; classic-db on your map, then your continent; then anywhere
+	for _, t in ipairs({ { onMap, false }, { onContinent, false }, { onMap, true }, { onContinent, true },
+		{ anywhere, false }, { anywhere, true } }) do
+		local list = among(t[1], t[2])
+		if #list > 0 then
+			local here = t[1] == onMap and where.x
+			return pick(list, here and where.x or nil, here and where.y or nil)
+		end
+	end
+	return nil
 end
