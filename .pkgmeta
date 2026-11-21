@@ -1,6 +1,7 @@
 package-as: EverlookPets
 
 ignore:
+  - screenshots
   - README.md
   - tests
   - tools
