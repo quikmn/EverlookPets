@@ -145,4 +145,4 @@ training-point costs seen in WoW Forever: Forever Hunter Pets (MIT). Beast abili
 https://github.com/JIVESCORP/eg-link-output-wowf); Forever Hunter Pets by Elmar Höfinghoff (MIT,
 https://github.com/Jazzman1976/Forever-Hunter-Pets); BeastScout by trevercomb (GPL-3.0,
 https://github.com/trevercomb/BeastScout); VMaNGOS world database (GPL-2.0-or-later, https://github.com/vmangos/core),
-game data © Blizzard Entertainment. Not affiliated with Blizzard Entertainment or Petopia.
+game data © Blizzard Entertainment. Not affiliated with Blizzard Entertainment.

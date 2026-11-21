@@ -135,7 +135,7 @@ function O.RowTooltip(row)
 			lines[#lines + 1] = ("Taught by (%d known; Where? for more):"):format(all)
 			for _, t in ipairs(top) do lines[#lines + 1] = "  " .. Logic.TeacherLine(t) end
 		elseif row.state == "tame" then
-			lines[#lines + 1] = "Petopia: " .. Logic.PetopiaRank(row.ability, row.target.rank)
+			lines[#lines + 1] = "No beast known yet; EverlookDB's pet page has the latest:"
 		end
 		lines[#lines + 1] = "EverlookDB: " .. Logic.SiteLink(fam, row.target.level)
 	end
@@ -276,12 +276,6 @@ app:Section("pet", "Your pet", function(stack)
 			desc = "The site's pet page for your pet's family at its level: every rank, and beasts to tame near that level.",
 			keywords = { "site", "link", "web" },
 			onClick = function() O:ShowLink("EverlookDB: this family's abilities and beasts to tame.", siteURL()) end },
-		{ label = "Petopia", width = 110,
-			desc = "Petopia's page for your pet's family: which beasts know which ranks.",
-			onClick = function()
-				local fam = ns.state.result and ns.state.result.family
-				O:ShowLink("Petopia: this family's beasts and the ranks they know.", fam and Logic.PetopiaFamily(fam) or Logic.PETOPIA)
-			end },
 	})
 
 	UI.Header(stack, "Still to learn", "Most worth it first: what you can do right now, then the biggest jump in rank, then the fewest "
@@ -369,7 +363,6 @@ app:Section("data", "Data and links", function(stack)
 		.. "point costs: Beast Training as Forever Hunter Pets (MIT) and EG Link players (CC BY 4.0) read it. Tamed by you "
 		.. "and your wishlist stay on your computer, per character.")
 	UI.CopyBox(stack, "EverlookDB pets", function() return siteURL() end)
-	UI.CopyBox(stack, "Petopia abilities", Logic.PETOPIA .. "abilities.php")
 end)
 
 ------------------------------------------------------------------------

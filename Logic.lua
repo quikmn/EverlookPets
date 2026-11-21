@@ -5,19 +5,14 @@ local L = {}
 ns.Logic = L
 
 L.SITE = "https://everlookdb.com/pets.html"
-L.PETOPIA = "https://www.wow-petopia.com/classic/"
 
 -- The site's pet page for a family, with its level slider set ("pets.html?family=cat&level=48").
 function L.SiteLink(fam, level)
 	local q = {}
-	if fam and fam.petopia then q[#q + 1] = "family=" .. fam.petopia end
+	if fam and fam.slug then q[#q + 1] = "family=" .. fam.slug end
 	if type(level) == "number" and level >= 1 and level <= 60 then q[#q + 1] = "level=" .. level end
 	return L.SITE .. (#q > 0 and ("?" .. table.concat(q, "&")) or "")
 end
-
--- Petopia's list of beasts that know one rank ("abilities.php#bite7"), or its whole family page.
-function L.PetopiaRank(ab, rank) return L.PETOPIA .. "abilities.php#" .. ab.petopia .. (rank or "") end
-function L.PetopiaFamily(fam) return L.PETOPIA .. "family.php?id=" .. fam.petopia end
 
 -- The highest rank a pet of `level` can have (nil: none yet), and the first rank it can't have yet (nil: maxed).
 function L.RankWindow(ab, level)

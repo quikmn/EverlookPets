@@ -316,7 +316,7 @@ def main() -> int:
     w("D.families = {")
     for f in pets["families"]:
         abil = ", ".join(lua_str(x) for x in f["abilities"])
-        w(f"\t[{f['id']}] = {{ key = {lua_str(f['key'])}, petopia = {lua_str(f['petopia'])}, icon = {f['icon']}, "
+        w(f"\t[{f['id']}] = {{ key = {lua_str(f['key'])}, slug = {lua_str(f['petopia'])}, icon = {f['icon']}, "
           f"diet = {f['diet']}, abilities = {{ {abil} }} }},")
     w("}")
     w("D.abilities = {")
@@ -326,7 +326,7 @@ def main() -> int:
             f"{{ rank = {r['rank']}, level = {r['level']}, spell = {r['spell']}"
             + (", forever = true" if r.get("forever") else "") + " }"
             for r in ab["ranks"])
-        w(f"\t[{lua_str(ab['key'])}] = {{ name = {lua_str(first.get('name') or ab['key'])}, petopia = {lua_str(ab['petopia'])}, "
+        w(f"\t[{lua_str(ab['key'])}] = {{ name = {lua_str(first.get('name') or ab['key'])}, "
           f"trainer = {str(bool(ab['trainer'])).lower()}, forever = {str(bool(ab['forever'])).lower()}, "
           f"icon = {first.get('icon') or 'nil'}, families = {{ {', '.join(str(x) for x in ab['families'])} }},")
         w(f"\t\tranks = {{ {ranks} }} }},")

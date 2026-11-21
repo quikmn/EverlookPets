@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Petopia links removed: the Petopia button on Your pet, the Petopia line in a row's tooltip and the Petopia box on Data and links. A tame nobody has reported a beast for now points to EverlookDB's pet page.
 - Bestiary: beasts whose level nobody has reported yet ("level ?", WoW Forever's new ones) now come last instead of first. Among beasts of the same level, the ones known to teach something come first.
 - Bestiary data refreshed from EverlookDB: more spawn spots seen in WoW Forever, a few more levels, and rare beasts marked rare (Barnabus). A beast no longer lists a whole continent ("Eastern Kingdoms") as one of its zones.
 - Settings: "Use the raid warning sound instead" is on the Settings page now, so the settings search finds it too.

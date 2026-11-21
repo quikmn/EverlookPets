@@ -54,17 +54,17 @@ end)
 -- The rank logic, on fake data
 ------------------------------------------------------------------------
 local L = ns.Logic
-local BITE = { name = "Bite", petopia = "bite", trainer = false, forever = false,
+local BITE = { name = "Bite", trainer = false, forever = false,
 	ranks = { { rank = 1, level = 1, spell = 101 }, { rank = 2, level = 8, spell = 102 }, { rank = 3, level = 16, spell = 103 }, { rank = 4, level = 24, spell = 104 } } }
-local GROWL = { name = "Growl", petopia = "growl", trainer = true, forever = false,
+local GROWL = { name = "Growl", trainer = true, forever = false,
 	ranks = { { rank = 1, level = 1, spell = 201 }, { rank = 2, level = 10, spell = 202 }, { rank = 3, level = 20, spell = 203 } } }
-local DASH = { name = "Dash", petopia = "dash", trainer = false, forever = false,
+local DASH = { name = "Dash", trainer = false, forever = false,
 	ranks = { { rank = 1, level = 30, spell = 301 }, { rank = 2, level = 40, spell = 302 } } }
-local PINCH = { name = "Pinch", petopia = "pinch", trainer = false, forever = true,
+local PINCH = { name = "Pinch", trainer = false, forever = true,
 	ranks = { { rank = 1, level = 12, spell = 401, forever = true }, { rank = 2, level = 24, spell = 402, forever = true } } }
 local FAKE = {
 	foods = { "Meat", "Fish", "Cheese", "Bread", "Fungus", "Fruit", "Raw meat", "Raw fish" },
-	families = { [2] = { key = "Cat", petopia = "cat", diet = 3, abilities = { "Bite", "Growl", "Dash", "Pinch", "Missing" } } },
+	families = { [2] = { key = "Cat", slug = "cat", diet = 3, abilities = { "Bite", "Growl", "Dash", "Pinch", "Missing" } } },
 	abilities = { Bite = BITE, Growl = GROWL, Dash = DASH, Pinch = PINCH },
 }
 local function knows(t) return function(spell) return t[spell] == true end end
@@ -127,7 +127,6 @@ step("logic: a pet's whole family, things to do first, links", function()
 	eq(res.rows[1].state, "trainer"); eq(res.rows[2].state, "tame"); eq(res.rows[4].state, "locked")
 	eq(res.todo, 2); eq(res.lag, 5)
 	eq(L.Evaluate(FAKE, { familyId = 99, petLevel = 1 }).family, nil, "unknown family")
-	eq(L.PetopiaRank(BITE, 7), "https://www.wow-petopia.com/classic/abilities.php#bite7")
 	eq(L.SiteLink(FAKE.families[2], 48), "https://everlookdb.com/pets.html?family=cat&level=48")
 	eq(L.SiteLink(nil, nil), "https://everlookdb.com/pets.html")
 	eq(table.concat(L.Foods(FAKE, 3), ","), "Meat,Fish")
@@ -151,7 +150,7 @@ step("logic: alerts only for what changed", function()
 end)
 
 step("bestiary: who teaches a rank, best for you first", function()
-	local NEW = { name = "Swipe", petopia = "swipe", trainer = false, forever = true,
+	local NEW = { name = "Swipe", trainer = false, forever = true,
 		ranks = { { rank = 1, level = 12, spell = 301, forever = true } } }
 	local D = {
 		abilities = { Bite = BITE, Swipe = NEW },
@@ -198,9 +197,9 @@ end)
 -- The bestiary browser's logic (Bestiary.lua), on fake data
 ------------------------------------------------------------------------
 local Bst = ns.Bestiary
-local CLAW = { name = "Claw", petopia = "claw", trainer = false, forever = false,
+local CLAW = { name = "Claw", trainer = false, forever = false,
 	ranks = { { rank = 1, level = 1, spell = 501 }, { rank = 2, level = 8, spell = 502 }, { rank = 3, level = 16, spell = 503 } } }
-local HOWL = { name = "Furious Howl", petopia = "furioushowl", trainer = false, forever = false,
+local HOWL = { name = "Furious Howl", trainer = false, forever = false,
 	ranks = { { rank = 1, level = 10, spell = 601 }, { rank = 2, level = 24, spell = 602 } } }
 local BD = {
 	foods = FAKE.foods,
@@ -479,10 +478,16 @@ step("opening the window clears the badge; rows and links", function()
 	local rows = ns.Options.Rows()
 	check(#rows > 5, "rows listed")
 	local tip = ns.Options.RowTooltip(row("Bite"))
-	-- beasts that teach Bite 3 are known, so the tooltip names them instead of linking Petopia
+	-- beasts that teach Bite 3 are known, so the tooltip names them
 	check(has(tip, "Taught by"), table.concat(tip, " / "))
 	check(not has(tip, "Petopia:"), table.concat(tip, " / "))
 	check(has(tip, "EverlookDB: https://everlookdb.com/pets.html?family=cat&level=16"), table.concat(tip, " / "))
+	-- a tame nobody has reported a beast for: the tooltip points to EverlookDB, no other site
+	local lone = setmetatable({ target = setmetatable({ spell = 999999 }, { __index = row("Bite").target }) }, { __index = row("Bite") })
+	tip = ns.Options.RowTooltip(lone)
+	check(has(tip, "No beast known yet"), table.concat(tip, " / "))
+	check(has(tip, "EverlookDB: https://everlookdb.com/pets.html?family=cat"), table.concat(tip, " / "))
+	for _, l in ipairs(tip) do check(not l:lower():find("petopia", 1, true), l) end
 	ns.db.showLocked = false
 	for _, r in ipairs(ns.Options.Rows()) do check(r.state ~= "locked", "locked hidden") end
 	ns.db.showLocked = true
@@ -969,6 +974,17 @@ step("rough edges: level ? on tooltips, a failing waypoint, the map pin's edge",
 	eq(st, "confirmed")
 	local _, st2 = ns.MapPins.Edge({ { state = "classic" } })
 	eq(st2, "classic")
+end)
+
+step("no links to other pet sites: every link is EverlookDB", function()
+	local toc = assert(io.open(ROOT .. "/EverlookPets.toc")):read("*a")
+	for line in toc:gmatch("[^\r\n]+") do
+		local rel = line:gsub("\\", "/"):gsub("%s+$", "")
+		if not line:match("^%s*#") and rel:match("%.lua$") and not rel:find("^Libs/") then
+			local src = assert(io.open(ROOT .. "/" .. rel)):read("*a"):lower()
+			check(not src:find("petopia", 1, true), rel .. " mentions Petopia")
+		end
+	end
 end)
 
 step("after everything: still no reads of missing globals, no stray writes", function()
