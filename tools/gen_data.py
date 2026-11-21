@@ -168,6 +168,12 @@ def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, off
     for mid, (name, _, typ) in sorted(maps.items()):
         if typ in (3, 4, 5) and name not in by_name:
             by_name[name] = mid
+    def zone_points(points: list) -> list:
+        """Only points on a zone's map (or smaller): a point on a continent or the world map isn't a spawn spot
+        (the bestiary would list "Eastern Kingdoms" as a zone and send a waypoint there)."""
+        return [p for p in points if isinstance(p, list) and len(p) >= 3
+                and maps.get(int(p[0]), ("", 0, 3))[2] >= 3]
+
     rows = []
     for npc in sorted(tame):
         name, rank, display, zone = info.get(npc, ("", 0, 0, ""))
@@ -177,15 +183,16 @@ def wild_rows(tame: dict, info: dict, data_dir: Path, maps: dict, used: set, off
             rank = {1: 1, 2: 3, 4: 2}.get(c.get("rank", 0), 0)
         jz = jazz.get(str(npc), {})
         src, groups = 0, []
-        if jz.get("at"):
-            src, groups = 1, spots(jz["at"])
-        elif eg.get(str(npc), {}).get("at"):
-            src, groups = 1, spots([p for p in eg[str(npc)]["at"] if len(p) >= 3])
-        elif c.get("at"):
-            groups = spots(c["at"])
+        jz_at, eg_at, c_at = (zone_points(x.get("at") or []) for x in (jz, eg.get(str(npc), {}), c))
+        if jz_at:
+            src, groups = 1, spots(jz_at)
+        elif eg_at:
+            src, groups = 1, spots(eg_at)
+        elif c_at:
+            groups = spots(c_at)
         if not groups:
             # last: where our own Collector's players saw it (WoW Forever)
-            pts = collector_points(collector_npc(npc, offline))
+            pts = zone_points(collector_points(collector_npc(npc, offline)))
             if pts:
                 src, groups = 1, spots(pts)
         places = []
