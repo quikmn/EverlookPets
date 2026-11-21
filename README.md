@@ -1,4 +1,4 @@
-# Everlook Pets
+# EverlookDB Pets
 
 Hunter pets for WoW Forever (1.60.1, interface 16001): your pet's abilities, the best rank its level allows, how
 to get the next one, and a bestiary of every tameable beast: what it teaches, where it spawns, a wishlist and map pins. From the makers of [EverlookDB.com](https://everlookdb.com); the addon's page is
@@ -59,7 +59,7 @@ map (and a setting) turns them off.
 
 **Alerts, once per change.** A chat line when a new rank opens as your pet levels, or when you learn a rank your pet
 lacks. A pet seen for the first time, or a level that opens many ranks at once, gets one summary line instead. The
-minimap button and the data-broker plugin (shown by Everlook Bar, Titan Panel, ChocolateBar...) carry a count of
+minimap button and the data-broker plugin (shown by EverlookDB Bar, Titan Panel, ChocolateBar...) carry a count of
 what's new until you open the window.
 
 **Tameable beasts.** Hovering a wild beast shows "Tameable", its family and level, whether it's too high for you yet,

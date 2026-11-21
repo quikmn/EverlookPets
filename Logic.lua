@@ -1,4 +1,4 @@
--- Everlook Pets: the rank logic. Plain functions over plain tables (no game calls), so the tests can feed it fake
+-- EverlookDB Pets: the rank logic. Plain functions over plain tables (no game calls), so the tests can feed it fake
 -- data. Core.lua reads the game and hands these functions what the pet and the hunter know.
 local _, ns = ...
 local L = {}

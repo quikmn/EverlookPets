@@ -1,4 +1,4 @@
--- Everlook Pets: the bestiary's logic. Plain functions over the data tables and a context you pass in (your level,
+-- EverlookDB Pets: the bestiary's logic. Plain functions over the data tables and a context you pass in (your level,
 -- your pet, your wishlist and tames, names in the game's language), so the tests can feed it fake data.
 --   B.Entries(D)                    every tameable beast the browser lists, sorted by level (unknown last) then name
 --   B.Parse(D, query, abilityName)  "bite 6 cat stranglethorn rare" -> what the search asks for

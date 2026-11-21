@@ -1,4 +1,4 @@
--- Everlook Pets: core. Names, saved settings, events, and reading the game: your pet, what it knows, what you know.
+-- EverlookDB Pets: core. Names, saved settings, events, and reading the game: your pet, what it knows, what you know.
 -- Every game call goes through ns.Call (missing function or an error gives nil) and every value through ns.Num or
 -- ns.Str (secret values and odd types give nil), so a change in the client never breaks the addon.
 local ADDON, ns = ...
@@ -7,7 +7,7 @@ local ADDON, ns = ...
 -- The name. Renaming the addon: change these lines, the .toc Title and SavedVariables lines, and (if the folder
 -- changes) the .toc file name and the folder.
 ------------------------------------------------------------------------
-ns.NAME = "Everlook Pets"
+ns.NAME = "EverlookDB Pets"
 ns.SLASH = "/epets"
 ns.SLASH_ID = "EVERLOOKPETS"
 ns.PREFIX = "EverlookPets" -- global frame names and the LibDataBroker name
@@ -66,7 +66,7 @@ end
 ns.DEFAULTS = {
 	chat = true,        -- a chat line when something becomes actionable
 	lagWarn = 3,        -- say so when the pet is this many levels below you (0: never)
-	minimap = "auto",   -- the minimap button: true, false, or "auto" (shown unless Everlook Bar is loaded: its plugin shows the same)
+	minimap = "auto",   -- the minimap button: true, false, or "auto" (shown unless EverlookDB Bar is loaded: its plugin shows the same)
 	angle = 200,        -- where the minimap button sits around the minimap (degrees)
 	tooltip = true,     -- "Tameable" lines on beasts' tooltips
 	showLocked = true,  -- list abilities that open at a higher pet level
@@ -367,7 +367,7 @@ function ns.RecordTame(npc, n)
 	ns.cdb.tamed[npc] = math.max(1, (ns.cdb.tamed[npc] or 0) + (n or 1))
 end
 
--- Is the minimap button wanted? "auto": yes, unless Everlook Bar is loaded (its bar plugin shows the same count).
+-- Is the minimap button wanted? "auto": yes, unless EverlookDB Bar is loaded (its bar plugin shows the same count).
 function ns.ShowMinimapButton()
 	local v = ns.db and ns.db.minimap
 	if v == "auto" or v == nil then
@@ -466,7 +466,7 @@ ns.On("ADDON_LOADED", function(_, name)
 	_G[ns.SAVED] = fill(type(_G[ns.SAVED]) == "table" and _G[ns.SAVED] or {}, ns.DEFAULTS)
 	_G[ns.SAVED_CHAR] = fill(type(_G[ns.SAVED_CHAR]) == "table" and _G[ns.SAVED_CHAR] or {}, ns.CHAR_DEFAULTS)
 	ns.db, ns.cdb = _G[ns.SAVED], _G[ns.SAVED_CHAR]
-	-- 2026-11-19: the minimap button's default became "auto" (off while Everlook Bar is loaded). Saved settings from
+	-- 2026-11-19: the minimap button's default became "auto" (off while EverlookDB Bar is loaded). Saved settings from
 	-- before have the old default written in (true); a switched-off button (false) stays off.
 	if (tonumber(ns.db.version) or 1) < 2 then
 		if ns.db.minimap == true then ns.db.minimap = "auto" end

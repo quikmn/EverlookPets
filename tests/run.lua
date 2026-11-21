@@ -1,4 +1,4 @@
--- Offline tests for Everlook Pets: the rank logic and the bestiary's search, filters, chips, "still to learn" and map
+-- Offline tests for EverlookDB Pets: the rank logic and the bestiary's search, filters, chips, "still to learn" and map
 -- pins on fake data, then the whole addon loaded in TOC order against wowmock.lua with a fake hunter and pet: what it
 -- shows, when it speaks up in chat, the badge, the chat commands, the tameable tooltip lines, the Bestiary and beast
 -- pages, the wishlist and near alerts, "tamed by you", waypoints and the world map pins.
@@ -520,11 +520,11 @@ step("chat commands: help, check, a setting, status, a typo", function()
 	slash("reset")
 	eq(ns.db.lagWarn, 3, "reset done")
 	eq(ns.db.minimap, "auto", "minimap back to automatic")
-	check(ns.ShowMinimapButton(), "auto without Everlook Bar: shown")
+	check(ns.ShowMinimapButton(), "auto without EverlookDB Bar: shown")
 	MOCK.loaded.EverlookBar = true
-	check(not ns.ShowMinimapButton(), "auto with Everlook Bar: off (its plugin shows the count)")
+	check(not ns.ShowMinimapButton(), "auto with EverlookDB Bar: off (its plugin shows the count)")
 	slash("minimap on")
-	check(ns.ShowMinimapButton() and ns.db.minimap == true, "switched on by hand: shown even with Everlook Bar")
+	check(ns.ShowMinimapButton() and ns.db.minimap == true, "switched on by hand: shown even with EverlookDB Bar")
 	MOCK.loaded.EverlookBar = nil
 	ns.db.minimap = "auto"
 end)
@@ -710,7 +710,7 @@ step("near alert: rare and wishlisted beasts, once in 5 minutes, with a sound", 
 	check(out[1]:find("Creepthess (rare Spider, level", 1, true) and out[1]:find("on your wishlist", 1, true), out[1])
 	check(not out[1]:find("/tar ", 1, true), "no /tar to retype: " .. out[1])
 	check(out[1]:find("|Haddon:EverlookPets:beast:14279|h[Beast page]|h", 1, true), "a beast page link: " .. out[1])
-	check(out[1]:find("Key Bindings > AddOns > Everlook Pets", 1, true), "says once how to target it with a key")
+	check(out[1]:find("Key Bindings > AddOns > EverlookDB Pets", 1, true), "says once how to target it with a key")
 	eq(MOCK.sounds, 1, "a sound")
 	eq(MOCK.lastSound, ns.Alerts.SOUND_SOFT, "a soft one by default")
 	-- the key binding's secure button targets that beast

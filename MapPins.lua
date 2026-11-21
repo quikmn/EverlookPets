@@ -1,4 +1,4 @@
--- Everlook Pets: "Tameable beasts" on the world map. A pin where a beast spawns that teaches a rank your pet lacks
+-- EverlookDB Pets: "Tameable beasts" on the world map. A pin where a beast spawns that teaches a rank your pet lacks
 -- (one its level allows, not sold by pet trainers) and that you can tame at your level. The pin is the beast's family
 -- icon; its edge says how sure the rank is (green confirmed, white seen in WoW Forever, grey classic data). Hover for
 -- what it teaches, click for its page in /epets. A switch on the map and the "map" setting turn the pins off.

@@ -1,4 +1,4 @@
--- Everlook Pets: the window (/epets), its settings (also from chat) and the chat commands.
+-- EverlookDB Pets: the window (/epets), its settings (also from chat) and the chat commands.
 -- Pages: "Your pet" (status, what it can still learn best first, every ability with what to do next), "Bestiary"
 -- and the beast page (Browser.lua), "Settings", "Data and links".
 local ADDON, ns = ...
@@ -40,7 +40,7 @@ app:Setting({ key = "lag", type = "number", label = "Note when my pet is this ma
 	get = function() return ns.db.lagWarn end, set = function(v) ns.db.lagWarn = v end,
 	after = function() ns:Update() end })
 app:Setting({ key = "minimap", type = "bool", label = "Minimap button (with a count of what's new)",
-	desc = "Off by default while Everlook Bar is loaded: its Everlook Pets plugin on the bar shows the same count.",
+	desc = "Off by default while EverlookDB Bar is loaded: its EverlookDB Pets plugin on the bar shows the same count.",
 	keywords = { "icon", "badge", "button" },
 	get = function() return ns.ShowMinimapButton() end, set = function(v) ns.db.minimap = v and true or false end,
 	after = function() ns.Alerts:Draw() end })
@@ -57,7 +57,7 @@ app:Setting({ key = "wish", type = "bool", label = "Tell me when a beast on my w
 	keywords = { "wishlist", "star", "favorite", "alert" },
 	get = function() return ns.db.wishAlert end, set = function(v) ns.db.wishAlert = v end })
 app:Setting({ key = "sound", type = "bool", label = "Play a sound with those lines",
-	desc = "A soft ping. Target the beast with a key: Key Bindings > AddOns > Everlook Pets.",
+	desc = "A soft ping. Target the beast with a key: Key Bindings > AddOns > EverlookDB Pets.",
 	keywords = { "sound", "audio", "warning", "target", "key", "binding" },
 	get = function() return ns.db.alertSound end, set = function(v) ns.db.alertSound = v end })
 app:Setting({ key = "loud", type = "bool", label = "Use the raid warning sound instead (louder)",
@@ -238,7 +238,7 @@ app:Section("pet", "Your pet", function(stack)
 	UI.Header(stack, "Your pet")
 	UI.Note(stack, function()
 		local st = ns.state
-		if not st.hunter then return "Everlook Pets is for hunters: log in on a hunter to see your pet." end
+		if not st.hunter then return "EverlookDB Pets is for hunters: log in on a hunter to see your pet." end
 		if not st.pet then return "No pet out. Call your pet to see its abilities." end
 		if not (st.result and st.result.family) then return "This pet's family isn't in our data." end
 		local lag = Logic.LagText(st.result.lag, ns.db.lagWarn)

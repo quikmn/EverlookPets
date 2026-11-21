@@ -1,4 +1,4 @@
--- Everlook Pets: the Bestiary page (search, filter chips, a card per beast with a wishlist star) and the beast page
+-- EverlookDB Pets: the Bestiary page (search, filter chips, a card per beast with a wishlist star) and the beast page
 -- (model, levels, what it teaches, attack speed, diet, where it spawns, "Set waypoint"). Options.lua registers
 -- both pages on the window: ns.Browser.AddBestiary(app) after "Your pet", ns.Browser.AddBeast(app) last (the beast
 -- page has no sidebar entry: it opens from a card, and "Bestiary" stays lit in the sidebar).

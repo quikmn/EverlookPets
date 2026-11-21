@@ -1,4 +1,4 @@
--- Everlook Pets: a "Tameable" line on wild beasts' tooltips (hunters only): the family, its level, what that family
+-- EverlookDB Pets: a "Tameable" line on wild beasts' tooltips (hunters only): the family, its level, what that family
 -- can learn, and, from EverlookDB's bestiary, what this beast teaches when tamed ("Teaches: Bite 2 · Claw 3") with
 -- how sure that is (confirmed, seen in WoW Forever, or classic data).
 -- Uses the shared EverlookTooltip layout, so its lines sit with the other EverlookDB addons' lines.

@@ -1,4 +1,4 @@
--- A small fake of the WoW client for offline tests (from Everlook Bar's; a hunter and a pet at the end) (Lua 5.1 via lupa).
+-- A small fake of the WoW client for offline tests (from EverlookDB Bar's; a hunter and a pet at the end) (Lua 5.1 via lupa).
 -- Secret values are tables with a locked metatable: arithmetic, comparison, length, indexing and calls throw, the
 -- way the real client stops addons from reading them. Widget setters that the client lets take secrets accept
 -- them; every other widget method throws when handed one.
@@ -390,7 +390,7 @@ function MOCK.Fire(event, ...)
 end
 
 ------------------------------------------------------------------------
--- Everlook Pets: a hunter with a pet. Tests change MOCK.pet, MOCK.playerLevel and MOCK.hunterKnows.
+-- EverlookDB Pets: a hunter with a pet. Tests change MOCK.pet, MOCK.playerLevel and MOCK.hunterKnows.
 ------------------------------------------------------------------------
 MOCK.class = "HUNTER"
 MOCK.playerLevel = 20
@@ -436,7 +436,7 @@ C_StableInfo = {
 	GetStabledPetList = function() return MOCK.stabled end,
 }
 
--- Everlook Pets 0.3: units around you, the map, waypoints, sounds and the world map canvas.
+-- EverlookDB Pets 0.3: units around you, the map, waypoints, sounds and the world map canvas.
 MOCK.units = {} -- [unit] = { guid, class (classification), dead }
 MOCK.petGUID = nil
 UnitGUID = function(u)

@@ -1,5 +1,5 @@
--- Everlook Pets: telling you when something becomes actionable. A chat line once per change (a new rank opened, you
--- learned a rank your pet lacks), a count on the minimap button and on the LibDataBroker plugin (Everlook Bar,
+-- EverlookDB Pets: telling you when something becomes actionable. A chat line once per change (a new rank opened, you
+-- learned a rank your pet lacks), a count on the minimap button and on the LibDataBroker plugin (EverlookDB Bar,
 -- Titan Panel, ChocolateBar...) until you open the window, and a note when your pet falls behind your level.
 local _, ns = ...
 local Logic = ns.Logic
@@ -64,7 +64,7 @@ end
 -- A.NEAR_AGAIN seconds per beast. Seen through nameplates (enemy nameplates on), your target and your mouse-over.
 -- The line has a [Waypoint] link (to its nearest known spawn spot). Targeting can't come from a chat link (the game
 -- allows it only from a key or a click on a secure button), so a key binding targets the beast from the last alert:
--- Key Bindings > AddOns > Everlook Pets (Bindings.xml), through the secure button below.
+-- Key Bindings > AddOns > EverlookDB Pets (Bindings.xml), through the secure button below.
 ------------------------------------------------------------------------
 A.NEAR_AGAIN = 300
 A.nearSaid = {}
@@ -145,7 +145,7 @@ function A.NearExtras(e)
 		out[#out + 1] = MUTED .. "Press " .. key .. " to target it.|r"
 	elseif ns.db and not ns.db.toldTargetKey then
 		ns.db.toldTargetKey = true
-		out[#out + 1] = MUTED .. "A key can target it: Key Bindings > AddOns > Everlook Pets.|r"
+		out[#out + 1] = MUTED .. "A key can target it: Key Bindings > AddOns > EverlookDB Pets.|r"
 	end
 	return table.concat(out, " ")
 end
@@ -227,7 +227,7 @@ function A:Tooltip(tip)
 end
 
 ------------------------------------------------------------------------
--- LibDataBroker plugin (shown by any data-broker display, Everlook Bar included)
+-- LibDataBroker plugin (shown by any data-broker display, EverlookDB Bar included)
 ------------------------------------------------------------------------
 local ldb
 -- Hunters only: another class would get a "Hunters only" plugin on its bars.
@@ -295,7 +295,7 @@ function A:SetupMinimap()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	b:SetScript("OnDragStart", function(self)
-		-- collected by a button drawer (Everlook Bar, MinimapButtonBag...): it is not ours to move around the minimap
+		-- collected by a button drawer (EverlookDB Bar, MinimapButtonBag...): it is not ours to move around the minimap
 		if self:GetParent() ~= Minimap then return end
 		self:SetScript("OnUpdate", function()
 			local mx, my = Minimap:GetCenter()

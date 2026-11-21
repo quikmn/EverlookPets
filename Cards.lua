@@ -1,4 +1,4 @@
--- Everlook Pets: a list of row cards for the bestiary and the pet page (EverlookUI's look: a card a shade lighter
+-- EverlookDB Pets: a list of row cards for the bestiary and the pet page (EverlookUI's look: a card a shade lighter
 -- than the window, an icon on the left, a white title, muted lines under it, small rank chips, plain buttons on the
 -- right). Long lists show a page at a time with a "Show more" button.
 --   ns.Cards(stack, opt) with opt:

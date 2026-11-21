@@ -1,4 +1,4 @@
-"""Run Everlook Pets' offline tests in Lua 5.1 (WoW's version) via lupa.
+"""Run EverlookDB Pets' offline tests in Lua 5.1 (WoW's version) via lupa.
 
 Usage: python -P tests/run.py
 """

@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- The addon is now called EverlookDB Pets (was Everlook Pets), like the rest of the EverlookDB family. Settings, commands and the folder stay the same.
+
 ## v0.4.2 (2026-11-21)
 - Petopia links removed: the Petopia button on Your pet, the Petopia line in a row's tooltip and the Petopia box on Data and links. A tame nobody has reported a beast for now points to EverlookDB's pet page.
 - Bestiary: beasts whose level nobody has reported yet ("level ?", WoW Forever's new ones) now come last instead of first. Among beasts of the same level, the ones known to teach something come first.
