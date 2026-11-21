@@ -6,3 +6,4 @@ ignore:
   - tests
   - tools
   - .github
+  - curseforge
