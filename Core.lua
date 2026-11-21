@@ -78,6 +78,10 @@ ns.DEFAULTS = {
 	mapPins = true,     -- "Tameable beasts" pins on the world map
 	levelCard = true,   -- the level-up card: what's new for you and your pet at a new level
 	levelChat = false,  -- ... one chat line instead of the card
+	levelPet = true,         -- the card's parts: new ranks your pet can learn (where to tame them)
+	levelPetTrainer = false, -- ... the pet trainer's ranks (Growl, Great Stamina, resistances)
+	levelHunter = false,     -- ... the hunter trainer's new spells and ranks
+	levelHunterPin = false,  -- ... with the nearest hunter trainer's pin
 }
 -- wishlist: { [npc id] = true } (the bestiary's star); tamed: { [npc id] = times } (your own tames, for "tamed by you")
 ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {} }

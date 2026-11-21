@@ -1173,6 +1173,8 @@ step("level up card: shows after PLAYER_LEVEL_UP, pins, Escape, the chat-instead
 	MOCK.playerLevel = 40
 	MOCK.hunterKnows = {}
 	ns.cdb.alerted["Shadowclaw|2"] = {}
+	-- every part of the card on (the defaults show only your pet's ranks: the next step)
+	slash("levelhunter on"); slash("levelhunterpin on"); slash("levelpettrainer on")
 	ns:Update(); flush()
 	local sounds = MOCK.sounds or 0
 	mark = #MOCK.log
@@ -1230,6 +1232,81 @@ step("level up card: shows after PLAYER_LEVEL_UP, pins, Escape, the chat-instead
 	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
 	check(not f:IsShown() and #logSince(mark) == 0, "card off: quiet")
 	slash("levelcard on")
+	slash("levelhunter off"); slash("levelhunterpin off"); slash("levelpettrainer off")
+	MOCK.pet, MOCK.playerLevel, MOCK.hunterKnows = saved.pet, saved.level, saved.knows
+	ns.cdb.pets["Shadowclaw|2"], ns.cdb.alerted["Shadowclaw|2"], ns.cdb.unseen["Shadowclaw|2"], ns.cdb.lagNoted["Shadowclaw|2"] = nil, nil, nil, nil
+	ns:Update(); flush()
+end)
+
+step("level up card parts: the defaults, each part on and off, the chat line follows", function()
+	eq(ns.DEFAULTS.levelPet, true, "pet ranks on by default")
+	eq(ns.DEFAULTS.levelPetTrainer, false, "pet trainer off by default")
+	eq(ns.DEFAULTS.levelHunter, false, "hunter trainer off by default")
+	eq(ns.DEFAULTS.levelHunterPin, false, "trainer pin off by default")
+	local d = LU.Sections()
+	check(d.pet and not d.petTrainer and not d.hunter and not d.hunterPin, "saved defaults")
+	-- LU.Pick on made-up content
+	local full = { level = 40, pet = { { name = "Claw" } }, hunter = { { name = "Aimed Shot" } }, trainer = { { name = "Growl" } },
+		hunterTrainer = { name = "H" }, petTrainer = { name = "P" }, lag = "behind", empty = false }
+	local c = LU.Pick(full, LU.SECTION_DEFAULTS)
+	check(#c.pet == 1 and #c.hunter == 0 and #c.trainer == 0 and not c.hunterTrainer and not c.petTrainer and not c.hunterPin and not c.empty, "defaults: pet only")
+	eq(c.lag, "behind", "the lag note stays with the pet part")
+	eq(#full.hunter, 1, "the content itself is untouched")
+	c = LU.Pick(full, { pet = false, petTrainer = true })
+	check(#c.pet == 0 and c.lag == nil and #c.trainer == 1 and c.petTrainer and #c.hunter == 0, "pet trainer only")
+	c = LU.Pick(full, { hunter = true })
+	check(#c.hunter == 1 and c.hunterTrainer and not c.hunterPin, "hunter trainer, no pin")
+	c = LU.Pick(full, { hunter = true, hunterPin = true })
+	check(c.hunterPin, "hunter trainer with its pin")
+	c = LU.Pick(full, { hunterPin = true })
+	check(not c.hunterPin and #c.hunter == 0, "the pin needs the hunter part")
+	c = LU.Pick(full, {})
+	check(c.empty, "nothing ticked: empty")
+	-- in the game: Shadowclaw at 40, defaults
+	local saved = { pet = MOCK.pet, level = MOCK.playerLevel, knows = MOCK.hunterKnows }
+	MOCK.pet = { name = "Shadowclaw", family = "Cat", familyId = 2, level = 40, knows = set(16831, 17259, 23109, 24452, 14918, 4191) }
+	MOCK.playerLevel = 40
+	MOCK.hunterKnows = {}
+	ns:Update(); flush()
+	LU.Hide()
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	local f = LU.frame
+	check(f:IsShown(), "the card shows with the defaults")
+	c = f.content
+	check(findItem(c.pet, "Claw") and #c.hunter == 0 and #c.trainer == 0, "only the pet's ranks")
+	check(not f.primary:IsShown(), "no trainer pin by default")
+	local heads = {}
+	for _, h in ipairs(f.heads) do if h:IsShown() then heads[#heads + 1] = strip(h.text:GetText()) end end
+	eq(#heads, 1, table.concat(heads, " / "))
+	check(heads[1]:find("For Shadowclaw", 1, true), heads[1])
+	-- the hunter part on: its header, no pin until that is ticked too
+	slash("levelhunter on")
+	slash("levelup")
+	c = f.content
+	check(#c.hunter > 0 and not f.primary:IsShown(), "hunter spells, no pin")
+	slash("levelhunterpin on")
+	slash("levelup")
+	check(f.primary:IsShown() and strip(f.primary:GetText()) == "Pin nearest trainer", "the pin")
+	-- only the pet trainer
+	slash("levelhunter off"); slash("levelhunterpin off"); slash("levelpet off"); slash("levelpettrainer on")
+	slash("levelup")
+	c = f.content
+	check(#c.pet == 0 and #c.hunter == 0, "no pet, no hunter part")
+	-- nothing ticked: no card, no chat line
+	slash("levelpettrainer off")
+	f:Hide()
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	check(not f:IsShown(), "nothing ticked: no card")
+	eq(#logSince(mark), 0, "and no line")
+	-- the chat line follows the choices
+	slash("levelpet on"); slash("levelchat on")
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	local out = logSince(mark)
+	eq(#out, 1, table.concat(out, " / "))
+	check(out[1]:find("for Shadowclaw", 1, true) and not out[1]:find("hunter trainer", 1, true), out[1])
+	slash("levelchat off")
 	MOCK.pet, MOCK.playerLevel, MOCK.hunterKnows = saved.pet, saved.level, saved.knows
 	ns.cdb.pets["Shadowclaw|2"], ns.cdb.alerted["Shadowclaw|2"], ns.cdb.unseen["Shadowclaw|2"], ns.cdb.lagNoted["Shadowclaw|2"] = nil, nil, nil, nil
 	ns:Update(); flush()
@@ -1238,6 +1315,7 @@ end)
 step("level up card: waits for the end of a fight; nothing new shows nothing; not for other classes", function()
 	local saved = MOCK.playerLevel
 	LU.Hide()
+	slash("levelhunter on") -- level 36: new hunter spells only
 	MOCK.playerLevel = 36
 	MOCK.combat = true
 	MOCK.Fire("PLAYER_LEVEL_UP", 36); flush()
@@ -1263,6 +1341,7 @@ step("level up card: waits for the end of a fight; nothing new shows nothing; no
 	eq(LU.Show(40), nil, "not for a mage")
 	check(not LU.frame:IsShown(), "no card for a mage")
 	MOCK.class = "HUNTER"
+	slash("levelhunter off")
 	MOCK.playerLevel = saved
 	ns:Update(); flush()
 end)

@@ -79,13 +79,38 @@ app:Setting({ key = "map", type = "bool", label = "Tameable beasts on the world 
 	get = function() return ns.db.mapPins end, set = function(v) ns.db.mapPins = v end,
 	after = function() if ns.MapPins then ns.MapPins:Refresh() end end })
 app:Setting({ key = "levelcard", type = "bool", label = "Show the level-up card when I level up",
-	desc = "A card near the top of the screen: new ranks for your pet (and where to tame a beast that teaches them), the hunter trainer's new spells and the pet trainer's new ranks, with map pins. It waits for the end of a fight. /epets levelup shows it again.",
+	desc = "A card near the top of the screen: new ranks for your pet (and where to tame a beast that teaches them), and if you tick them below, the hunter trainer's new spells and the pet trainer's new ranks. It waits for the end of a fight. /epets levelup shows it again.",
 	keywords = { "level up", "ding", "card", "trainer", "new spells", "celebrate", "levelup" },
-	get = function() return ns.db.levelCard end, set = function(v) ns.db.levelCard = v end })
+	get = function() return ns.db.levelCard end, set = function(v) ns.db.levelCard = v end,
+	after = function() app:Refresh() end })
 app:Setting({ key = "levelchat", type = "bool", label = "Level up: one chat line instead of the card",
 	desc = "What's new at your level in one chat line; /epets levelup still shows the card.",
 	keywords = { "level up", "ding", "chat", "message", "levelup" },
-	get = function() return ns.db.levelChat end, set = function(v) ns.db.levelChat = v end })
+	get = function() return ns.db.levelChat end, set = function(v) ns.db.levelChat = v end,
+	after = function() app:Refresh() end })
+-- The card's parts (also the chat line's): only what's ticked shows; nothing ticked left for a level, no card.
+local function levelOff() return not (ns.db.levelCard or ns.db.levelChat) end
+app:Setting({ key = "levelpet", type = "bool", label = "New ranks your pet can learn (where to tame them)",
+	desc = "\"New: Claw rank 6 for your pet. Tame a Silt Crawler to learn it\", with a Pin to the beast.",
+	keywords = { "pet ranks", "claw", "bite", "tame", "rank", "level up", "card", "levelup" },
+	disabled = levelOff,
+	get = function() return ns.db.levelPet end, set = function(v) ns.db.levelPet = v end })
+app:Setting({ key = "levelpettrainer", type = "bool", label = "Pet trainer ranks (Growl, Great Stamina, resistances)",
+	desc = "The ranks a pet trainer sells that opened at your level.",
+	keywords = { "trainer", "pet trainer", "growl", "stamina", "resistance", "level up", "card", "levelup" },
+	disabled = levelOff,
+	get = function() return ns.db.levelPetTrainer end, set = function(v) ns.db.levelPetTrainer = v end })
+app:Setting({ key = "levelhunter", type = "bool", label = "Hunter trainer: new spells and ranks",
+	desc = "The hunter trainer's spells and ranks from your new level, with what they cost in all.",
+	keywords = { "trainer", "hunter trainer", "hunter skills", "spells", "class", "level up", "card", "levelup" },
+	disabled = levelOff,
+	get = function() return ns.db.levelHunter end, set = function(v) ns.db.levelHunter = v end,
+	after = function() app:Refresh() end })
+app:Setting({ key = "levelhunterpin", type = "bool", label = "Nearest hunter trainer pin",
+	desc = "A \"Pin nearest trainer\" button on the card (with the hunter trainer part on).",
+	keywords = { "trainer", "hunter trainer", "pin", "waypoint", "level up", "card", "levelup" },
+	disabled = function() return levelOff() or not ns.db.levelHunter end,
+	get = function() return ns.db.levelHunterPin end, set = function(v) ns.db.levelHunterPin = v end })
 app:Setting({ key = "locked", type = "bool", label = "List abilities that open at a higher pet level",
 	keywords = { "later", "future", "hide" },
 	get = function() return ns.db.showLocked end, set = function(v) ns.db.showLocked = v end,
@@ -346,6 +371,10 @@ app:Section("settings", "Settings", function(stack)
 	UI.Header(stack, "Level up")
 	app:Widget(stack, "levelcard")
 	app:Widget(stack, "levelchat")
+	app:Widget(stack, "levelpet")
+	app:Widget(stack, "levelpettrainer")
+	app:Widget(stack, "levelhunter")
+	app:Widget(stack, "levelhunterpin")
 	UI.Header(stack, "Beasts near you")
 	app:Widget(stack, "rare")
 	app:Widget(stack, "wish")

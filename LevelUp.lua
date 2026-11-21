@@ -6,6 +6,8 @@
 --                  tame at your level, your continent first, with a Pin to its nearest spawn spot)
 --   At the hunter trainer   the class spells and ranks trainable from this level (Trainers.lua)
 --   At a pet trainer        the trainer-sold ranks (Growl, Cower, Great Stamina...) that opened
+-- Each part is a setting (LU.Pick, LU.Sections): only "For your pet" is on by default; the trainer parts and the
+-- hunter trainer's pin are ticked in Settings. The chat line follows the same choices.
 -- In combat the card waits until the fight ends. Nothing new: no card. A setting gives one chat line instead.
 -- The plain functions (LU.HunterSpells, LU.PetNews, LU.Trainer, LU.Compute) take the data and a context, so the tests
 -- can feed them fake data; the frame is built the first time it shows.
@@ -178,6 +180,32 @@ function LU.Compute(D, s)
 	out.lag = s.lag
 	out.empty = #out.hunter == 0 and #out.pet == 0 and #out.trainer == 0
 	return out
+end
+
+-- Only the parts of the card you ticked (Settings, under the level-up card): opt = { pet, petTrainer, hunter,
+-- hunterPin } (nil: the defaults, only your pet's new ranks). A copy of c without the parts that are off; empty again
+-- when nothing ticked is left. c.hunterPin: the hunter trainer's pin (the card's primary button) is wanted.
+LU.SECTION_DEFAULTS = { pet = true, petTrainer = false, hunter = false, hunterPin = false }
+function LU.Pick(c, opt)
+	if not c then return nil end
+	opt = opt or LU.SECTION_DEFAULTS
+	local out = {}
+	for k, v in pairs(c) do out[k] = v end
+	if not opt.pet then out.pet, out.lag = {}, nil end
+	if not opt.petTrainer then out.trainer, out.petTrainer = {}, nil end
+	if not opt.hunter then out.hunter, out.hunterTrainer = {}, nil end
+	out.hunterPin = (opt.hunter and opt.hunterPin and out.hunterTrainer) and true or false
+	out.empty = #out.hunter == 0 and #out.pet == 0 and #out.trainer == 0
+	return out
+end
+
+-- The parts you ticked, from the saved settings.
+function LU.Sections()
+	local db = ns.db or {}
+	local d = LU.SECTION_DEFAULTS
+	local function pick(k, key) if db[key] == nil then return d[k] end return db[key] and true or false end
+	return { pet = pick("pet", "levelPet"), petTrainer = pick("petTrainer", "levelPetTrainer"),
+		hunter = pick("hunter", "levelHunter"), hunterPin = pick("hunterPin", "levelHunterPin") }
 end
 
 ------------------------------------------------------------------------
@@ -557,7 +585,7 @@ function LU.Fill(c)
 		y = y + 8
 	end
 	if #c.trainer > 0 then
-		header("At a pet trainer", nil, (c.petTrainer and #c.hunter > 0) and function() LU.PinTrainer("pet") end or nil)
+		header("At a pet trainer", nil, (c.petTrainer and c.hunterPin) and function() LU.PinTrainer("pet") end or nil)
 		local list = {}
 		for _, it in ipairs(c.trainer) do
 			list[#list + 1] = { icon = ns.AbilityIcon(it.ab, it.rank), text = it.name .. MUTED .. "  rank " .. it.rank.rank .. "|r" }
@@ -575,9 +603,10 @@ function LU.Fill(c)
 	f.hint:ClearAllPoints()
 	f.hint:SetPoint("TOPLEFT", f.body, "BOTTOMLEFT", 0, -noteH - 2)
 	-- the one primary button: a trainer to go to (the hunter trainer's first, else the pet trainer's)
-	local tr = c.hunterTrainer or c.petTrainer
+	local hunterTr = c.hunterPin and c.hunterTrainer or nil
+	local tr = hunterTr or c.petTrainer
 	f.primary:SetShown(tr ~= nil)
-	f.primary:SetText(c.hunterTrainer and "Pin nearest trainer" or "Pin pet trainer")
+	f.primary:SetText(hunterTr and "Pin nearest trainer" or "Pin pet trainer")
 	f.open:ClearAllPoints()
 	if tr then f.open:SetPoint("RIGHT", f.primary, "LEFT", -8, 0) else f.open:SetPoint("BOTTOMRIGHT", -PAD, 14) end
 	f:SetHeight(56 + y + noteH + 16 + 52)
@@ -602,7 +631,7 @@ end
 function LU.PinTrainer(kind)
 	local c = card and card.content
 	if not c then return nil end
-	local t = (kind == "pet" and c.petTrainer) or (kind ~= "pet" and (c.hunterTrainer or c.petTrainer))
+	local t = (kind == "pet" and c.petTrainer) or (kind ~= "pet" and ((c.hunterPin and c.hunterTrainer) or c.petTrainer))
 	if not t then return nil end
 	local how = ns.SetWaypoint(t.map, t.x, t.y, t.name)
 	local where = LU.TrainerLine(t)
@@ -634,11 +663,11 @@ function LU.Show(level, forced)
 		return "waiting"
 	end
 	LU.pending = nil
-	local c = LU.Build(level)
+	local c = LU.Pick(LU.Build(level), LU.Sections())
 	if not c then return nil end
 	LU.last = c
 	if c.empty then
-		if forced then ns:Print(("level %d: nothing new for you or your pet at this level."):format(c.level)) end
+		if forced then ns:Print(("level %d: nothing new for you or your pet at this level (in the parts of the card you have on: Settings, Level up)."):format(c.level)) end
 		return "none"
 	end
 	if not forced and ns.db.levelChat then
