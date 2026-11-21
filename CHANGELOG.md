@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.0 (2026-11-21)
 - Missed a message? /epets recent (or Recent in the window) lists everything the addon told you, with buttons to show the card or set the waypoint again.
 - The level-up card now only shows new ranks for your pet by default; switch on pet trainer, hunter trainer and new spells in the settings if you want them.
 - The new ranks on the level-up card can cover your current pet's family (the default; with no pet out, the last one you had out), families you tick ("These families", your own pets' families listed first), or all families, each rank marked with its family ("Cat: Claw rank 6"). The card keeps to four rows, then "and N more".
