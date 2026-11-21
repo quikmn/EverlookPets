@@ -2,6 +2,9 @@
 
 ## Unreleased
 - The addon is now called EverlookDB Pets (was Everlook Pets), like the rest of the EverlookDB family. Settings, commands and the folder stay the same.
+- **Level-up card.** When your hunter levels up, a card near the top of the screen says what's new: "Level 40! Here's what's new for you and Shadowclaw". First, the new ranks your pet's family can learn at that level and your pet doesn't have: "New: Claw rank 6 for Shadowclaw. Tame a Silt Crawler (level 40-41, Swamp of Sorrows) to learn it", with a Pin button that puts a waypoint on that beast's nearest spawn spot (TomTom's when it's loaded, else the game's map pin). If you already know the rank, it says to teach it to your pet instead; if another of your pets knows it, it names that pet. Then the hunter trainer's new spells and ranks, with icons, what they cost in all and the nearest trainer of your faction, and the ranks to buy from a pet trainer (Growl, Great Stamina, the resistances...). "Pin nearest trainer" puts a waypoint on the hunter trainer; "Open in EverlookDB Pets" opens your pet's page.
+- The card is calm: no sound, never in the middle of a fight (it waits until the fight ends), and nothing at all at a level where nothing is new. Drag it anywhere and it stays there; close it with its X or Escape. It never closes another window.
+- `/epets levelup` shows the card for your level again. Settings: "Show the level-up card when I level up" and "Level up: one chat line instead of the card".
 
 ## v0.4.2 (2026-11-21)
 - Petopia links removed: the Petopia button on Your pet, the Petopia line in a row's tooltip and the Petopia box on Data and links. A tame nobody has reported a beast for now points to EverlookDB's pet page.

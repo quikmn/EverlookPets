@@ -73,6 +73,14 @@ app:Setting({ key = "map", type = "bool", label = "Tameable beasts on the world 
 	keywords = { "map", "pins", "world map", "spawn", "where" },
 	get = function() return ns.db.mapPins end, set = function(v) ns.db.mapPins = v end,
 	after = function() if ns.MapPins then ns.MapPins:Refresh() end end })
+app:Setting({ key = "levelcard", type = "bool", label = "Show the level-up card when I level up",
+	desc = "A card near the top of the screen: new ranks for your pet (and where to tame a beast that teaches them), the hunter trainer's new spells and the pet trainer's new ranks, with map pins. It waits for the end of a fight. /epets levelup shows it again.",
+	keywords = { "level up", "ding", "card", "trainer", "new spells", "celebrate", "levelup" },
+	get = function() return ns.db.levelCard end, set = function(v) ns.db.levelCard = v end })
+app:Setting({ key = "levelchat", type = "bool", label = "Level up: one chat line instead of the card",
+	desc = "What's new at your level in one chat line; /epets levelup still shows the card.",
+	keywords = { "level up", "ding", "chat", "message", "levelup" },
+	get = function() return ns.db.levelChat end, set = function(v) ns.db.levelChat = v end })
 app:Setting({ key = "locked", type = "bool", label = "List abilities that open at a higher pet level",
 	keywords = { "later", "future", "hide" },
 	get = function() return ns.db.showLocked end, set = function(v) ns.db.showLocked = v end,
@@ -330,6 +338,9 @@ app:Section("settings", "Settings", function(stack)
 	app:Widget(stack, "chat")
 	app:Widget(stack, "lag")
 	app:Widget(stack, "minimap")
+	UI.Header(stack, "Level up")
+	app:Widget(stack, "levelcard")
+	app:Widget(stack, "levelchat")
 	UI.Header(stack, "Beasts near you")
 	app:Widget(stack, "rare")
 	app:Widget(stack, "wish")
@@ -343,7 +354,7 @@ app:Section("settings", "Settings", function(stack)
 	UI.Header(stack, "Chat commands")
 	UI.Note(stack, ns.SLASH .. "  this window\n" .. ns.SLASH .. " check  what to do now, in chat\n" .. ns.SLASH
 		.. " chat off, lag 5, minimap off, tooltip off  change a setting\n" .. ns.SLASH .. " get  every setting\n"
-		.. ns.SLASH .. " beasts <words>  the Bestiary with that search (bite 6, cat, rare)\n" .. ns.SLASH .. " wishlist  your starred beasts\n"
+		.. ns.SLASH .. " levelup  what's new at your level, on the level-up card\n" .. ns.SLASH .. " beasts <words>  the Bestiary with that search (bite 6, cat, rare)\n" .. ns.SLASH .. " wishlist  your starred beasts\n"
 		.. ns.SLASH .. " search <words>  find a setting\n" .. ns.SLASH .. " status, version, help")
 end)
 
@@ -362,6 +373,9 @@ app:Section("data", "Data and links", function(stack)
 		.. "spawn points (Classic 1.12, GPL-3.0). Models, names, levels and rare or elite: the game's data on EverlookDB. Training "
 		.. "point costs: Beast Training as Forever Hunter Pets (MIT) and EG Link players (CC BY 4.0) read it. Tamed by you "
 		.. "and your wishlist stay on your computer, per character.")
+	UI.Note(stack, "The level-up card: what hunter trainers teach at each level, and where hunter and pet trainers stand, from "
+		.. "classic-db (CMaNGOS, GPL-3.0) on EverlookDB, with spots WoW Forever players saw (EG Link) first; spell names and "
+		.. "icons from the WoW Forever game files.")
 	UI.CopyBox(stack, "EverlookDB pets", function() return siteURL() end)
 end)
 
@@ -381,6 +395,11 @@ app:Command("check", "check", "what to do for your pet now, in chat", function()
 	local lag = res and Logic.LagText(res.lag, ns.db.lagWarn)
 	if lag then ns:Print(lag .. ".") end
 end, { "todo" })
+
+app:Command("levelup", "levelup", "what's new for you and your pet at your level, on the level-up card", function()
+	ns:Update()
+	ns.LevelUp.Show(nil, true)
+end, { "lvl", "ding" })
 
 app:Command("beasts", "beasts [words]", "the Bestiary, with a search (bite 6, cat, stranglethorn, rare)", function(rest)
 	ns.Browser.OpenSearch(tostring(rest or ""):gsub("^%s+", ""):gsub("%s+$", ""))

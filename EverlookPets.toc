@@ -15,6 +15,7 @@ Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\EverlookUI\EverlookUI.lua
 Libs\EverlookUI\EverlookTooltip.lua
 Data.lua
+Trainers.lua
 Logic.lua
 Bestiary.lua
 Core.lua
@@ -24,4 +25,5 @@ Cards.lua
 Browser.lua
 Options.lua
 MapPins.lua
+LevelUp.lua
 MapPins.xml

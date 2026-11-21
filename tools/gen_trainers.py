@@ -1,0 +1,152 @@
+"""Write Trainers.lua: what the hunter trainer teaches at each level, and where hunter and pet trainers stand.
+
+    python tools/gen_trainers.py
+
+What it reads (EverlookDB's own data, no other addon's):
+  * Quarry's web/data/classicdb.json (classic-db by CMaNGOS, GPL-3.0): every NPC titled "Hunter Trainer" or
+    "Pet Trainer", the spells a hunter trainer teaches with the level each needs, where the NPC stands and which
+    faction it serves (its reaction to Alliance and Horde).
+  * Quarry's web/data/eglink.json (EG Link, CC BY 4.0): where WoW Forever players saw a trainer, preferred over
+    classic-db's spot.
+  * The WoW Forever client's tables (ForeverMiner's out/tables): SpellName (the English name; a spell the client
+    doesn't have is left out), Spell (its "Rank 3"), SpellMisc (its icon) and UiMap (zone names and continents).
+Spell names in your language come from the game at run time; these English names are the fallback.
+"""
+import csv
+import json
+import re
+import sys
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+QUARRY = Path(r"D:\Dev\Quarry")
+TABLES = Path(r"D:\Dev\ForeverMiner\out\tables")
+OUT = ROOT / "Trainers.lua"
+
+
+def lua_str(s: str) -> str:
+    return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def table(name: str, key: str = "ID", cols=None) -> dict:
+    out = {}
+    with open(TABLES / f"{name}.csv", encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            try:
+                k = int(r[key])
+            except (TypeError, ValueError):
+                continue
+            out[k] = r if cols is None else {c: r[c] for c in cols}
+    return out
+
+
+def continent_of(maps: dict, m: int) -> int:
+    for _ in range(8):
+        e = maps.get(m)
+        if not e:
+            return 0
+        if int(e["Type"] or 0) == 2:
+            return m
+        m = int(e["ParentUiMapID"] or 0)
+    return 0
+
+
+def side(react) -> str:
+    """'a', 'h' or 'n' (both) from classic-db's [reaction to Alliance, reaction to Horde]; '' when hostile to both."""
+    if not isinstance(react, list) or len(react) < 2:
+        return "n"
+    a, h = react[0] != "hostile", react[1] != "hostile"
+    return "n" if a and h else "a" if a else "h" if h else ""
+
+
+def rank_of(sub: str) -> int:
+    m = re.match(r"Rank (\d+)", sub or "")
+    return int(m.group(1)) if m else 0
+
+
+def main() -> int:
+    cdb = json.loads((QUARRY / "web" / "data" / "classicdb.json").read_text(encoding="utf-8"))["npcs"]
+    try:
+        eg = json.loads((QUARRY / "web" / "data" / "eglink.json").read_text(encoding="utf-8")).get("npcs", {})
+    except OSError:
+        eg = {}
+    names = {k: v["Name_lang"] for k, v in table("SpellName").items()}
+    subs = {k: v["NameSubtext_lang"] for k, v in table("Spell").items()}
+    icons = {int(r["SpellID"]): int(r["SpellIconFileDataID"] or 0) for r in table("SpellMisc").values()}
+    maps = table("UiMap")
+
+    spells, trainers = {}, []
+    for npc, n in sorted(cdb.items(), key=lambda kv: int(kv[0])):
+        title = n.get("title")
+        if title not in ("Hunter Trainer", "Pet Trainer") or n.get("name", "").startswith("["):
+            continue
+        at = (eg.get(npc, {}).get("at") or n.get("at") or [])
+        at = [p for p in at if isinstance(p, list) and len(p) >= 3 and int(maps.get(int(p[0]), {}).get("Type") or 0) >= 3]
+        s = side(n.get("react"))
+        if not at or not s:
+            continue
+        kind = "hunter" if title == "Hunter Trainer" else "pet"
+        top = 0
+        for t in n.get("teaches") or []:
+            sp, lvl = t.get("spell"), t.get("level")
+            if not (isinstance(sp, int) and isinstance(lvl, int)) or kind != "hunter":
+                continue
+            top = max(top, lvl)
+            if sp in names:
+                spells[sp] = (lvl, int(t.get("cost") or 0))
+        if kind == "hunter" and top == 0:
+            continue
+        m, x, y = int(at[0][0]), float(at[0][1]), float(at[0][2])
+        trainers.append((kind, int(npc), s, m, round(x * 10), round(y * 10), continent_of(maps, m), top if kind == "hunter" else 60,
+                         n["name"], maps.get(m, {}).get("Name_lang", "")))
+
+    # A spell whose lowest trained rank is above 1 needs a rank you get elsewhere (a talent: Aimed Shot, Counterattack;
+    # or one you start with: Raptor Strike 1). Those lower ranks' spell ids go along, so the addon lists the spell
+    # only when you know one of them.
+    lowest = {}
+    for sp in spells:
+        nm, r = names[sp], rank_of(subs.get(sp, ""))
+        lowest[nm] = min(lowest.get(nm, 99), r or 1)
+    needs = {}
+    for nm, lo in lowest.items():
+        if lo > 1:
+            needs[nm] = sorted(k for k, v in names.items() if v == nm and 0 < rank_of(subs.get(k, "")) < lo)
+
+    by_level = {}
+    for sp, (lvl, cost) in spells.items():
+        by_level.setdefault(lvl, []).append(sp)
+    L = []
+    w = L.append
+    w("-- Generated by tools/gen_trainers.py from EverlookDB's data. Do not edit by hand: run the script again.")
+    w("-- Hunter trainers' spells and where trainers stand: classic-db (CMaNGOS, GPL-3.0) via EverlookDB; spots seen in")
+    w("-- WoW Forever by EG Link players (CC BY 4.0) first. Names, ranks and icons: the WoW Forever client's spell tables.")
+    w("local _, ns = ...")
+    w("local D = ns.Data")
+    w(f"D.trainersGenerated = {lua_str(date.today().isoformat())}")
+    w("-- level = { { spell, rank (0 none), cost in copper, icon, English name, needs (spell ids: know one of them) }, ... }")
+    w("D.hunterSpells = {")
+    for lvl in sorted(by_level):
+        rows = []
+        for sp in sorted(by_level[lvl], key=lambda s: (names[s], s)):
+            nm = names[sp]
+            need = needs.get(nm)
+            rows.append(f"{{ {sp}, {rank_of(subs.get(sp, ''))}, {spells[sp][1]}, {icons.get(sp, 0)}, {lua_str(nm)}"
+                        + (f", {{ {', '.join(map(str, need))} }}" if need else "") + " }")
+        w(f"\t[{lvl}] = {{ " + ", ".join(rows) + " },")
+    w("}")
+    w("-- { kind (\"hunter\" or \"pet\"), npc id, side (\"a\", \"h\", \"n\" both), uiMap, x, y (tenths of a percent),")
+    w("--   continent uiMap, highest level it teaches, English name, English zone name }")
+    w("D.trainerNpcs = {")
+    for t in sorted(trainers):
+        kind, npc, s, m, x, y, cont, top, nm, zone = t
+        w(f"\t{{ {lua_str(kind)}, {npc}, {lua_str(s)}, {m}, {x}, {y}, {cont}, {top}, {lua_str(nm)}, {lua_str(zone)} }},")
+    w("}")
+    OUT.write_text("\n".join(L) + "\n", encoding="utf-8", newline="\n")
+    print(f"wrote {OUT}: {len(spells)} hunter spells over {len(by_level)} levels, "
+          f"{sum(1 for t in trainers if t[0] == 'hunter')} hunter trainers, {sum(1 for t in trainers if t[0] == 'pet')} pet trainers")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

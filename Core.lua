@@ -76,6 +76,8 @@ ns.DEFAULTS = {
 	alertLoud = false,  -- ... the raid warning sound instead
 	models = true,      -- 3D models on the beast page
 	mapPins = true,     -- "Tameable beasts" pins on the world map
+	levelCard = true,   -- the level-up card: what's new for you and your pet at a new level
+	levelChat = false,  -- ... one chat line instead of the card
 }
 -- wishlist: { [npc id] = true } (the bestiary's star); tamed: { [npc id] = times } (your own tames, for "tamed by you")
 ns.CHAR_DEFAULTS = { pets = {}, alerted = {}, unseen = {}, lagNoted = {}, wishlist = {}, tamed = {} }

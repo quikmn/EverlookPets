@@ -987,6 +987,204 @@ step("no links to other pet sites: every link is EverlookDB", function()
 	end
 end)
 
+------------------------------------------------------------------------
+-- The level-up card
+------------------------------------------------------------------------
+local LU = ns.LevelUp
+local function kinds(list)
+	local t = {}
+	for _, it in ipairs(list) do t[#t + 1] = it.kind .. ":" .. it.key .. " " .. it.rank.rank end
+	return table.concat(t, ", ")
+end
+local function findItem(list, key) for _, it in ipairs(list) do if it.key == key then return it end end end
+
+step("level up: the hunter trainer's new spells (talent ranks only when you have the talent)", function()
+	local D = ns.Data
+	local list = LU.HunterSpells(D, 36, 35, function() return false end)
+	local names = {}
+	for _, h in ipairs(list) do names[h.name .. " " .. h.rank] = h end
+	check(names["Viper Sting 1"] and names["Arcane Shot 5"] and names["Mend Pet 4"] and names["Immolation Trap 3"], "level 36 spells")
+	check(not names["Aimed Shot 3"], "Aimed Shot needs the talent")
+	eq(names["Viper Sting 1"].cost, 14000, "cost")
+	eq(LU.Money(14000), "1g 40s")
+	list = LU.HunterSpells(D, 36, 35, function(s) return s == 19434 or s == 3034 end)
+	names = {}
+	for _, h in ipairs(list) do names[h.name .. " " .. h.rank] = true end
+	check(names["Aimed Shot 3"], "with the talent: Aimed Shot 3")
+	check(not names["Viper Sting 1"], "a spell you know isn't new")
+	-- two levels at once (a level skipped while the card was off): both levels' spells
+	eq(#LU.HunterSpells(D, 38, 36, function() return false end), 2, "level 37 has none, 38 two")
+	eq(#LU.HunterSpells(D, 37, 36), 0, "nothing at an odd level")
+end)
+
+step("level up: your pet's new ranks, by family; teach before tame; trainer ranks apart", function()
+	local D = ns.Data
+	local where = { level = 40, continent = 1415 }
+	-- a level 40 cat: Claw 6 opens, tame a beast that knows it (with a spawn spot to pin)
+	local pet, tr = LU.PetNews(D, { level = 40, familyId = 2, petLevel = 40, petName = "Shadowclaw", where = where,
+		petKnows = knows(set(16831, 17258)) })
+	local claw = findItem(pet, "Claw")
+	check(claw and claw.kind == "tame" and claw.rank.rank == 6, kinds(pet))
+	check(claw.beast and claw.spot and claw.beasts[1] and not claw.beasts[1].tooHigh, "a beast to pin")
+	check(LU.PetTitle(claw, { petName = "Shadowclaw" }):find("Claw rank 6", 1, true), LU.PetTitle(claw, {}))
+	local sub = strip(LU.PetSub(claw, { petName = "Shadowclaw" }))
+	check(sub:find("^Tame a .+ %(level %d+") and sub:find("to learn it", 1, true), sub)
+	check(findItem(tr, "Growl") and findItem(tr, "Growl").kind == "trainer", "Growl 5 at a pet trainer: " .. kinds(tr))
+	check(not findItem(pet, "Growl"), "trainer ranks aren't in the pet list")
+	-- the hunter already knows Claw 6 (from another pet): teach it, first in the list
+	pet = LU.PetNews(D, { level = 40, familyId = 2, petLevel = 40, petName = "Shadowclaw", where = where,
+		petKnows = knows(set(16831)), hunterKnows = knows(set(16832)), free = 100 })
+	eq(pet[1].key, "Claw", "teach comes first: " .. kinds(pet))
+	eq(pet[1].kind, "teach")
+	check(strip(LU.PetSub(pet[1], { petName = "Shadowclaw" })):find("teach it to Shadowclaw", 1, true), LU.PetSub(pet[1], {}))
+	-- another pet knows it
+	pet = LU.PetNews(D, { level = 40, familyId = 2, petLevel = 40, where = where,
+		otherPet = function(s) return s == 16832 and "Mittens" or nil end })
+	eq(findItem(pet, "Claw").kind, "otherpet")
+	-- a pet that has it already: nothing about Claw
+	pet = LU.PetNews(D, { level = 40, familyId = 2, petLevel = 40, where = where, petKnows = knows(set(16832)) })
+	check(not findItem(pet, "Claw"), kinds(pet))
+	-- a wolf can't learn Claw
+	pet = LU.PetNews(D, { level = 40, familyId = 1, petLevel = 40, where = where })
+	check(not findItem(pet, "Claw") and findItem(pet, "Furious Howl"), kinds(pet))
+	-- a level 36 cat: only the pet trainer's ranks
+	pet, tr = LU.PetNews(D, { level = 36, familyId = 2, petLevel = 36, where = where })
+	eq(#pet, 0, kinds(pet))
+	check(findItem(tr, "Great Stamina") and findItem(tr, "Natural Armor"), kinds(tr))
+	-- the pet below the rank's level: it says when
+	pet = LU.PetNews(D, { level = 40, familyId = 2, petLevel = 38, petName = "Shadowclaw", where = where })
+	check(findItem(pet, "Claw").petLow, "pet too low")
+	check(strip(LU.PetSub(findItem(pet, "Claw"), { petName = "Shadowclaw" })):find("once Shadowclaw is level 40", 1, true), "when")
+end)
+
+step("level up: nothing new at a level, the nearest trainer for your faction", function()
+	local D = ns.Data
+	local c = LU.Compute(D, { level = 37, familyId = 2, petLevel = 37, where = { level = 37 } })
+	check(c.empty, "level 37: nothing new")
+	c = LU.Compute(D, { level = 38, familyId = 2, petLevel = 38, where = { level = 38 } })
+	check(not c.empty and #c.hunter == 2 and #c.pet == 0 and #c.trainer == 0, "level 38: only trainer spells")
+	-- Horde in the Barrens (Kalimdor): a Horde trainer on Kalimdor
+	local t = LU.Trainer(D, "hunter", 38, { map = 1413, x = 0.5, y = 0.5, continent = 1414 }, "h")
+	check(t and t.side == "h" and t.continent == 1414, "Horde Kalimdor trainer: " .. tostring(t and t.name))
+	-- in Orgrimmar: the nearest one on that map
+	t = LU.Trainer(D, "hunter", 38, { map = 1454, x = 0.67, y = 0.20, continent = 1414 }, "h")
+	eq(t.name, "Xor'juul", "nearest in Orgrimmar")
+	-- Alliance in Dun Morogh: never a Horde trainer; a starter trainer (up to level 6) doesn't count at 38
+	t = LU.Trainer(D, "hunter", 38, { map = 1426, x = 0.29, y = 0.67, continent = 1415 }, "a")
+	check(t.side == "a" and t.top >= 38 and t.name ~= "Thorgas Grimson", t.name)
+	-- with the game's continent positions the nearest across zones wins
+	local fake = { [1453] = { 0, 0 }, [1455] = { 100, 0 }, [1432] = { 900, 0 }, [1426] = { 120, 0 } }
+	local function pos(map, x, y) local p = fake[map]; if p then return 1415, p[1] + x, p[2] + y end end
+	t = LU.Trainer(D, "pet", 38, { map = 1426, x = 0.5, y = 0.5, continent = 1415 }, "a", pos)
+	eq(t.name, "Peria Lamenur", "same map first")
+	t = LU.Trainer(D, "pet", 38, { map = 1437, x = 0.5, y = 0.5, continent = 1415 }, "a", function(map, x, y)
+		if map == 1437 then return 1415, 880, 0 end
+		return pos(map, x, y)
+	end)
+	eq(t.name, "Claude Erksine", "Loch Modan's is nearest to the Wetlands")
+	eq(LU.Trainer(D, "pet", 38, {}, "h").side, "h", "faction only")
+end)
+
+step("level up card: shows after PLAYER_LEVEL_UP, pins, Escape, the chat-instead setting", function()
+	local saved = { pet = MOCK.pet, level = MOCK.playerLevel, knows = MOCK.hunterKnows }
+	MOCK.pet = { name = "Shadowclaw", family = "Cat", familyId = 2, level = 40, knows = set(16831, 17259, 23109, 24452, 14918, 4191) }
+	MOCK.playerLevel = 40
+	MOCK.hunterKnows = {}
+	ns.cdb.alerted["Shadowclaw|2"] = {}
+	ns:Update(); flush()
+	local sounds = MOCK.sounds or 0
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 40)
+	flush()
+	local f = LU.frame
+	check(f and f:IsShown(), "the card shows")
+	eq(MOCK.sounds or 0, sounds, "no sound")
+	eq(strip(f.title:GetText()), "Level 40!")
+	check(f.sub:GetText():find("Shadowclaw", 1, true), f.sub:GetText())
+	check(f:IsMovable(), "movable")
+	eq(f.__points[1][1], "TOP", "top centre")
+	local c = f.content
+	check(findItem(c.pet, "Claw") and #c.hunter > 0 and c.hunterTrainer, "pet, hunter and trainer parts")
+	-- the Claw row's Pin: a waypoint to a beast's spawn spot
+	local clawRow
+	for _, r in ipairs(f.rows) do if r:IsShown() and r.item and r.item.key == "Claw" then clawRow = r end end
+	check(clawRow and clawRow.pin:IsShown(), "Claw row with a Pin")
+	MOCK.waypoint = nil
+	clawRow.pin.__scripts.OnClick(clawRow.pin)
+	check(MOCK.waypoint and MOCK.waypoint.uiMapID == findItem(c.pet, "Claw").spot.map, "waypoint to the beast")
+	check(strip(f.noteText or ""):find("Waypoint:", 1, true), tostring(f.noteText))
+	-- the one primary button: the nearest hunter trainer (Alliance)
+	MOCK.waypoint = nil
+	f.primary.__scripts.OnClick(f.primary)
+	check(MOCK.waypoint and MOCK.waypoint.uiMapID == c.hunterTrainer.map, "waypoint to the trainer")
+	check(c.hunterTrainer.side ~= "h", "an Alliance trainer")
+	-- dragging remembers where it is
+	f.__points = { { "TOP", UIParent, "TOP", 40, -200 } }
+	f.__scripts.OnDragStop(f)
+	eq(ns.db.levelCardPos[3], 40); eq(ns.db.levelCardPos[4], -200)
+	-- Escape closes it (and only it)
+	local appShown = ns.app:IsShown()
+	f.__scripts.OnKeyDown(f, "ESCAPE")
+	check(not f:IsShown(), "Escape closes the card")
+	eq(ns.app:IsShown(), appShown, "the main window is untouched")
+	-- /epets levelup shows it again, where you left it
+	slash("levelup")
+	check(f:IsShown(), "shown again")
+	eq(f.__points[1][4], 40, "remembered x"); eq(f.__points[1][5], -200, "remembered y")
+	f:Hide()
+	-- the chat-instead setting: one line, no card
+	slash("levelchat on")
+	eq(ns.db.levelChat, true)
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	check(not f:IsShown(), "no card")
+	local out = logSince(mark)
+	eq(#out, 1, table.concat(out, " / "))
+	check(out[1]:find("Level 40!", 1, true) and out[1]:find("for Shadowclaw", 1, true) and out[1]:find("at the hunter trainer", 1, true), out[1])
+	slash("levelchat off")
+	-- card off: nothing at all
+	slash("levelcard off")
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 40); flush()
+	check(not f:IsShown() and #logSince(mark) == 0, "card off: quiet")
+	slash("levelcard on")
+	MOCK.pet, MOCK.playerLevel, MOCK.hunterKnows = saved.pet, saved.level, saved.knows
+	ns.cdb.pets["Shadowclaw|2"], ns.cdb.alerted["Shadowclaw|2"], ns.cdb.unseen["Shadowclaw|2"], ns.cdb.lagNoted["Shadowclaw|2"] = nil, nil, nil, nil
+	ns:Update(); flush()
+end)
+
+step("level up card: waits for the end of a fight; nothing new shows nothing; not for other classes", function()
+	local saved = MOCK.playerLevel
+	LU.Hide()
+	MOCK.playerLevel = 36
+	MOCK.combat = true
+	MOCK.Fire("PLAYER_LEVEL_UP", 36); flush()
+	check(not LU.frame:IsShown(), "not in combat")
+	check(LU.pending, "waiting")
+	MOCK.combat = false
+	MOCK.Fire("PLAYER_REGEN_ENABLED"); flush()
+	check(LU.frame:IsShown(), "after the fight")
+	eq(LU.pending, nil)
+	LU.Hide()
+	-- nothing new at 37: no card, no chat line
+	MOCK.playerLevel = 37
+	mark = #MOCK.log
+	MOCK.Fire("PLAYER_LEVEL_UP", 37); flush()
+	check(not LU.frame:IsShown(), "no card at 37")
+	eq(#logSince(mark), 0, "and no chat line")
+	-- asked for: one line saying so
+	slash("levelup")
+	check(has(logSince(mark), "nothing new for you or your pet"), table.concat(logSince(mark), " / "))
+	-- a mage: never
+	MOCK.class = "MAGE"
+	ns:Update()
+	eq(LU.Show(40), nil, "not for a mage")
+	check(not LU.frame:IsShown(), "no card for a mage")
+	MOCK.class = "HUNTER"
+	MOCK.playerLevel = saved
+	ns:Update(); flush()
+end)
+
 step("after everything: still no reads of missing globals, no stray writes", function()
 	for k in pairs(missingReads) do error("read missing global " .. k) end
 	for k in pairs(globalWrites) do check(ALLOWED[k], "wrote global " .. k) end

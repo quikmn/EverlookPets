@@ -393,6 +393,8 @@ end
 -- EverlookDB Pets: a hunter with a pet. Tests change MOCK.pet, MOCK.playerLevel and MOCK.hunterKnows.
 ------------------------------------------------------------------------
 MOCK.class = "HUNTER"
+MOCK.faction = "Alliance"
+UnitFactionGroup = function(u) if u == "player" then return MOCK.faction, MOCK.faction end end
 MOCK.playerLevel = 20
 MOCK.hunterKnows = {}
 MOCK.pet = nil
