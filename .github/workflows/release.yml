@@ -1,6 +1,5 @@
 # Push a tag like v1.0.0 and this builds EverlookPets-v1.0.0-forever.zip and a GitHub release, plus a copy named EverlookPets.zip
-# so https://github.com/quikmn/EverlookPets/releases/latest/download/EverlookPets.zip always gets the newest. WowUp uses release.json.
-# No CurseForge project yet: when there is one, add the upload step from EverlookDBAuctions (curseforge-upload.sh <project id>).
+# so https://github.com/quikmn/EverlookPets/releases/latest/download/EverlookPets.zip always gets the newest. WowUp uses release.json; the same zip goes to CurseForge.
 name: Release
 
 on:
@@ -32,3 +31,7 @@ jobs:
         run: |
           bash .github/release-notes.sh "$GITHUB_REF_NAME" > .release/notes.md
           gh release edit "$GITHUB_REF_NAME" --notes-file .release/notes.md
+      - name: Upload to CurseForge (project 1819945, WoW Forever)
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: bash .github/curseforge-upload.sh 1819945 .release/EverlookPets-${GITHUB_REF_NAME}-forever.zip EverlookPets.toc
