@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.1 (2026-11-21)
 - Waypoints in the bestiary now lead to where WoW Forever players actually see a beast; older classic spawn data is only used when we have nothing else, and says so.
 
 ## v0.5.0 (2026-11-21)
