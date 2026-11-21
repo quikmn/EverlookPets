@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.1 (2026-11-21)
 - The addon has its own icon in the addon list, in the EverlookDB style (the database stack with a paw).
 
 ## v0.4.0 (2026-11-20)
