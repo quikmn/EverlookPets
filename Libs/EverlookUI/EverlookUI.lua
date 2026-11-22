@@ -42,8 +42,13 @@
 -- opts.panel = true is a page the addon draws itself (a list, a log, a home page) in an empty frame that fills the
 -- page area; spec.groups = { { id = "main" }, { id = "settings", title = "Settings" } } with opts.group puts the
 -- sidebar rows in groups, each titled group under a small heading; spec.onPage(app, id) hears every page change.
+--
+-- Windows (EverlookUI 14): every window drawn with UI.WindowChrome, and every app's window, is listed in UI.windows
+-- (frame -> info), so a window manager (Everlook Bar's taskbar) can find, minimize and tile them. Nothing else changes
+-- for the window. UI.RegisterWindow(frame, { title = "Name" or fn(frame), icon = ..., noTaskbar = true }) adds to or
+-- changes that; UI.apps lists every app made by this copy or a later one (name, slash, pages for a Start menu).
 local LIB_ADDON = ... -- the folder of the addon whose copy this is (its Media\ sits next to this file)
-local MAJOR, MINOR = "EverlookUI-1", 13
+local MAJOR, MINOR = "EverlookUI-1", 14
 local UI = LibStub:NewLibrary(MAJOR, MINOR)
 if not UI then return end
 UI.version = MINOR
@@ -438,8 +443,49 @@ local function Tooltip(frame, title, body)
 end
 UI.Tooltip = Tooltip
 
+------------------------------------------------------------------------
+-- Windows and apps a window manager can find (EverlookUI 14). The tables survive library upgrades. A window is
+-- listed when it is drawn (UI.WindowChrome) or made by an app; whoever manages windows decides which listed frames
+-- are real windows (shown, movable, big enough) and reads the info:
+--   title      a string, or function(frame) -> string (default: the app's name, the frame's .title text, its name)
+--   icon       an icon name (UI.IconNames), texture path or file ID (default: the app's addon icon)
+--   app        the app the window belongs to
+--   noTaskbar  true: never list it (a toast, a menu, a card)
+-- frame.eluiMinimizing is true while a window manager hides the window to minimize it (it comes back as it was):
+-- an OnHide that clears state can keep it then.
+------------------------------------------------------------------------
+UI.windows = UI.windows or setmetatable({}, { __mode = "k" })
+UI.apps = UI.apps or {}
+UI.windowListeners = UI.windowListeners or {}
+
+function UI.RegisterWindow(frame, info)
+	if type(frame) ~= "table" then return nil end
+	local w = UI.windows[frame]
+	if not w then
+		w = {}
+		UI.windows[frame] = w
+	end
+	if type(info) == "table" then
+		for k, v in pairs(info) do w[k] = v end
+	end
+	for _, fn in ipairs(UI.windowListeners) do pcall(fn, frame, w) end
+	return w
+end
+
+function UI.UnregisterWindow(frame)
+	if type(frame) == "table" then UI.windows[frame] = nil end
+end
+
+function UI.WindowInfo(frame) return type(frame) == "table" and UI.windows[frame] or nil end
+
+-- fn(frame, info) runs for every window listed (or changed) from now on.
+function UI.OnWindowRegistered(fn)
+	if type(fn) == "function" then UI.windowListeners[#UI.windowListeners + 1] = fn end
+end
+
 -- The window look: a rounded slate box with a 1 px rim and a thin accent line along the top.
 local function WindowChrome(f, T)
+	UI.RegisterWindow(f)
 	f.bgFill, f.bgEdge = U.RoundBox(f, 8, T.bg, T.border)
 	local line = U.Solid(f, "ARTWORK", rgba(T.accent))
 	line:SetHeight(2)
@@ -2113,6 +2159,7 @@ function UI:NewApp(spec)
 	app.settings, app.settingOrder = {}, {}
 	app.commands, app.commandOrder = {}, {}
 	if spec.settingsPanel ~= false then app:RegisterSettingsPanel() end
+	UI.apps[#UI.apps + 1] = app
 	return app
 end
 
@@ -3553,6 +3600,7 @@ function App:CreateWindow()
 	f:Hide()
 	self.window = f
 	RestorePosition(self, f)
+	UI.RegisterWindow(f, { app = self })
 	W = math.floor((f:GetWidth() or W) + 0.5) -- a size the player gave it last time
 	WindowChrome(f, T)
 
@@ -3700,6 +3748,12 @@ function App:CreateWindow()
 		line:SetHeight(1)
 		line:SetPoint("BOTTOMLEFT", 14, 30 + #tools * 26 + 6)
 		line:SetPoint("RIGHT", side, "RIGHT", -14, 0)
+		-- tall enough that the last page never runs into the tools (EverlookUI 14): grow, and never resize smaller
+		local need = math.ceil(y + 14 + 30 + #tools * 26 + 6 + 8)
+		if need > MIN_H then
+			if f.SetResizeBounds then f:SetResizeBounds(W, need) elseif f.SetMinResize then f:SetMinResize(W, need) end
+		end
+		if (f:GetHeight() or 0) < need then f:SetHeight(need) end
 
 		-- the page header
 		f.pageTitle = Text(f, T.fontHuge, T.text)
@@ -3834,8 +3888,10 @@ function App:CreateWindow()
 	f:SetScript("OnHide", function()
 		ClosePopup()
 		f.searchBox:ClearFocus()
-		app:StopSearch()
-		app.history = nil -- Undo covers one visit of the window
+		if not f.eluiMinimizing then -- minimized (EverlookUI 14): it comes back with its search and Undo
+			app:StopSearch()
+			app.history = nil -- Undo covers one visit of the window
+		end
 		if spec.onHide then spec.onHide(app) end
 	end)
 	UI.CloseOnEscape(f)
