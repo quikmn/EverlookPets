@@ -36,7 +36,8 @@ def place(ims, out, gap=70, maxw=1760, maxh=980, shadows=True, up=1.0):
 
 
 place([raw("pet", crop=(0, 0, 1700, 1300), key=False)], "1-your-pet.png")
-place([raw("bestiary", crop=(0, 0, 1700, 1300), key=False)], "2-bestiary.png")
-place([raw("row-tooltip", key=False)], "3-where-to-tame.png", up=1.0)
-place([raw("pet", key=False), raw("bestiary", key=False)], "4-overview.png", gap=60)
-place([raw("settings", key=False)], "5-settings.png")
+place([raw("levelup-claw", key=False), raw("levelup-36", key=False)], "2-level-up-card.png", gap=90, up=1.2)
+place([raw("bestiary", crop=(0, 0, 1700, 1300), key=False)], "3-bestiary.png")
+place([raw("recent", key=False)], "4-recent.png")
+place([raw("row-tooltip", key=False)], "5-where-to-tame.png", up=1.0)
+place([raw("settings", key=False)], "6-settings.png")
