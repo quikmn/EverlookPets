@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.1 (2026-11-26)
 - The level-up card is a little wider, and rows without a Pin button use the whole width, so long lines (with "All families") are no longer cut off.
 - Settings search: the sidebar lights the page of the top result while you search.
 
