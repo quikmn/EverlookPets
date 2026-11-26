@@ -458,7 +458,7 @@ end
 ------------------------------------------------------------------------
 -- The card
 ------------------------------------------------------------------------
-local W, PAD, ROW, SROW = 480, 16, 42, 24
+local W, PAD, ROW, SROW = 530, 16, 42, 24
 local card, T
 
 local function savePos(f)
@@ -558,13 +558,22 @@ local function row(f, i)
 	r.pin:SetHeight(22)
 	r.pin:SetPoint("RIGHT", -8, 0)
 	r.title = UI.Text(r, T.font, T.text)
-	r.title:SetPoint("TOPLEFT", 42, -7)
-	r.title:SetPoint("RIGHT", -70, 0)
 	r.title:SetWordWrap(false)
 	r.sub = UI.Text(r, T.fontSmall + 1, T.muted)
-	r.sub:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -3)
-	r.sub:SetPoint("RIGHT", -70, 0)
 	r.sub:SetWordWrap(false)
+	-- the text runs up to Pin, or to the edge when there is no Pin
+	function r:Fit()
+		local right = self.pin:IsShown() and -70 or -10
+		if self.right == right then return end
+		self.right = right
+		self.title:ClearAllPoints()
+		self.title:SetPoint("TOPLEFT", 42, -7)
+		self.title:SetPoint("RIGHT", right, 0)
+		self.sub:ClearAllPoints()
+		self.sub:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, -3)
+		self.sub:SetPoint("RIGHT", right, 0)
+	end
+	r:Fit()
 	r:SetScript("OnEnter", function(self)
 		self.bg:SetVertexColor(rgba(T.surfaceHi))
 		if self.tip then
@@ -671,6 +680,7 @@ function LU.Fill(c)
 			r.title:SetText("|cffff9f40" .. c.lag .. "|r")
 			r.sub:SetText("Pets learn faster from kills near their own level.")
 			r.pin:Hide()
+			r:Fit()
 			r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
 			y = y + ROW + 4
 		end
@@ -689,6 +699,7 @@ function LU.Fill(c)
 			else
 				r.pin:Hide()
 			end
+			r:Fit()
 			r.onOpen = function()
 				if it.beast then ns.Browser.OpenBeast(it.beast) elseif it.kind == "tame" or it.kind == "tameunknown" then ns.Browser.OpenSearch(it.name .. " " .. it.rank.rank) else LU.OpenPage() end
 			end

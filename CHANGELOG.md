@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- The level-up card is a little wider, and rows without a Pin button use the whole width, so long lines (with "All families") are no longer cut off.
+- Settings search: the sidebar lights the page of the top result while you search.
+
 ## v0.6.0 (2026-11-21)
 - New: `/epets recent` (or Recent in the window) lists everything the addon told you, with buttons to show the card or set the waypoint again.
 - The level-up card shows new pet ranks only by default; trainer ranks and new spells can be switched on in the settings.
